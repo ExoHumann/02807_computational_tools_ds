@@ -3,14 +3,14 @@ requires = ["uv_build>=0.9.22,<0.10.0"]
 build-backend = "uv_build"
 
 [project]
-name = "musicnator"
+name = "afp"
 version = "0.0.1"
-description = "Project for DTU course 02807 Computational Tools for Data Science"
+description = "DTU 02807 project: neural audio fingerprinting with LSH retrieval and graph clustering"
 authors = [
-  { name = "Nikos Iliakis", email = "your@email.com" },
+  { name = "Nikos Iliakis" },
 ]
 
-keywords = ["machine learning", "MLOps"]
+keywords = ["audio fingerprinting", "locality-sensitive hashing", "graph clustering"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",
@@ -18,22 +18,22 @@ classifiers = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi==0.115.6",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "soundfile>=0.12",
     "torch==2.6.0",
-    "typer==0.15.1",
-    "uvicorn==0.34.0",
+    "torchaudio==2.6.0",
+    "tqdm>=4.66",
+    "transformers>=4.46",
 ]
 
 [dependency-groups]
 dev = [
-    "coverage==7.6.9",
     "invoke==2.2.0",
     "pre-commit==4.1.0",
     "pytest==8.3.4",
     "ruff==0.1.3",
     "mypy==1.19.1",
-    "mkdocs-material==9.7.1",
-    "mkdocstrings-python==2.0.1",
 ]
 
 
@@ -41,7 +41,7 @@ dev = [
 torch = [
     { index = "pytorch-cpu" },
 ]
-torchvision = [
+torchaudio = [
     { index = "pytorch-cpu" },
 ]
 
@@ -53,5 +53,5 @@ explicit = true
 [tool.ruff]
 line-length = 120
 
-[tool.coverage.run]
-omit = ["tests/*"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]

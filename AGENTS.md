@@ -11,10 +11,16 @@
 * The project uses `ruff` for linting and formatting:
     * To format code, use `uv run ruff format .`.
     * To lint code, use `uv run ruff check . --fix`.
-* The project uses `invoke` for task management. To see available tasks, use `uv run invoke --list` or refer to the
-    `tasks.py` file.
+* The project uses `invoke` for task management (`test`, `lint`, `fmt`). To see available tasks, use
+    `uv run invoke --list` or refer to the `tasks.py` file.
 * The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
     `uv run pre-commit run --all-files`. For more information, refer to the `.pre-commit-config.yaml` file.
+
+# Layout
+
+* Source lives in `src/afp/` (`afp` is a placeholder package name). See `README.md` for the module map.
+* Tests must not need audio data or a downloaded model.
+* Audio, cached embeddings and fingerprints live under `data/` and are git-ignored.
 
 # Code style
 
@@ -26,10 +32,6 @@
 
 # Documentation
 
-* If the project has a `docs/` folder, update documentation there as needed.
-* In this case the project will be using `mkdocs` for documentation. To build the docs locally, use
-    `uv run mkdocs serve`
-* Use existing docstring style.
 * Ensure all functions and classes have docstrings.
 * Use Google style for docstrings.
 * Update this `AGENTS.md` file if any new tools or commands are added to the project.
