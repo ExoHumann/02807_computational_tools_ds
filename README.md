@@ -2,7 +2,7 @@
 
 Project for DTU course 02807 Computational Tools for Data Science. Deadline: 4 December 2026.
 
-This project builds a song identification system, similar to Shazam or Google voice that can recognise a song from a short and possibly distorted TikTok like audio clip. We follow [Robust Neural Audio Fingerprinting using Music Foundation Models](https://arxiv.org/abs/2511.05399), we use a pretrained foundation model (MERT, or MuQ which is the paper's best backbone) to turn short segments of audio into fingerprints i.e: compact vector representations designed to stay similar under distortions such as noise, compression, time-acceleration, background noise etc. To go through this library of fingerprints the idea is to use Locality-Sensitive Hashing (LSH) and try to measure the trade-off between retrieval accuracy and speed against exhaustive search. We finally build a graph of songs that can share matching parts and apply graph clustering (Louvain) to uncover non-obvious connections between tracks, such as remixes covers or samples. The system will be evaluated on real TikTok clips.
+This project builds a song identification system, similar to Shazam or Google voice that can recognise a song from a short and possibly distorted TikTok like audio clip. We follow [Robust Neural Audio Fingerprinting using Music Foundation Models](https://arxiv.org/abs/2511.05399), we use a pretrained foundation model (MuQ, the paper's best-performing backbone) to turn short segments of audio into fingerprints i.e: compact vector representations designed to stay similar under distortions such as noise, compression, time-acceleration, background noise etc. To go through this library of fingerprints the idea is to use Locality-Sensitive Hashing (LSH) and try to measure the trade-off between retrieval accuracy and speed against exhaustive search. We finally build a graph of songs that can share matching parts and apply graph clustering (Louvain) to uncover non-obvious connections between tracks, such as remixes covers or samples. The system will be evaluated on real TikTok clips.
 
 ## Data
 
@@ -20,13 +20,42 @@ The download is resumable and checked against the published SHA-1. Each clip is 
 `data/processed/manifest.csv` lists every processed track (id, path, duration, title, artist, genre) and
 `skipped.csv` lists tracks that could not be decoded or are shorter than 10 s.
 
+## Fingerprints
+
+Three resumable steps turn the processed audio into fingerprints (`src/afp/fingerprint.py`):
+
+```bash
+uv run python -m afp.fingerprint cache    # MuQ features for every window, training pairs and evaluation queries
+uv run python -m afp.fingerprint train    # contrastive training of the 1024 -> 4096 -> 256 projection head
+uv run python -m afp.fingerprint encode   # write the fingerprints and print exact-search top-1 per distortion
+```
+
+Each 30 s clip is cut into 10 s windows with a 5 s hop (about 110,000 windows for the 25,000 tracks). MuQ is frozen;
+only the projection head is trained, on pairs of a clean window and a distorted copy of it (`src/afp/augment.py`).
+The tracks are split 20/80: the 20% only provide training pairs, and the evaluation queries come from the other 80%,
+so the head is never scored on tracks it learned from. Use `cache --limit-tracks 200 --pairs 500 --queries 100` for a
+quick trial run.
+
+Output: `data/processed/fingerprints/references.npz` (`vectors` as `float32 [N, 256]` with unit norm, plus
+`track_id`, `segment_idx`, `start_s`) and `queries.npz` (the same plus the `augmentation` category). The head is saved
+to `models/head.pt`.
+
+Speed: on CPU MuQ takes about 1.6 s per window (measured here), so `cache` with the defaults (about 153,000 windows)
+would take roughly three days. It needs a GPU, which means a CUDA build of torch (`pyproject.toml` currently pins the
+CPU build).
+
+Differences from the paper: noise and reverb are synthetic instead of MUSAN and Aachen recordings, there is no
+Encodec compression, and the open MuQ checkpoint was trained on the Million Song Dataset, so it may not reproduce the
+paper's numbers. MuQ weights are CC-BY-NC 4.0.
+
 ## Layout
 
 ```txt
 src/afp/
 ├── data.py        # download FMA, decode to 24 kHz mono, manifest, cut into 10 s segments
-├── augment.py     # the paper's distortions (not implemented yet)
-└── embed.py       # backbone + 1024 -> 4096 -> 256 projection head
+├── augment.py     # the paper's distortions (time stretch, pitch, noise, reverb, filters, echo)
+├── embed.py       # MuQ backbone, 1024 -> 4096 -> 256 projection head, contrastive training
+└── fingerprint.py # cache / train / encode command line
 tests/
 data/{raw,processed}/   # git-ignored contents
 notebooks/

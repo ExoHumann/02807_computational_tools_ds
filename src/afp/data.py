@@ -97,7 +97,7 @@ def load_audio(source: Path | BinaryIO, sample_rate: int = SAMPLE_RATE) -> np.nd
 
     Args:
         source: Path or binary file object holding any format ``soundfile`` can decode (mp3, wav, flac, ...).
-        sample_rate: Target sample rate in Hz. 24 kHz is what MuQ and MERT expect.
+        sample_rate: Target sample rate in Hz. 24 kHz is what MuQ expects.
 
     Returns:
         A 1D ``float32`` array.
@@ -143,6 +143,11 @@ def segment(
     segments = np.lib.stride_tricks.sliding_window_view(waveform, window)[::hop].copy()
     start_s = np.arange(len(segments)) * hop / sample_rate
     return segments, start_s
+
+
+def load_processed(path: Path) -> np.ndarray:
+    """Load a processed track written by :func:`process_zip` as a ``float32`` waveform in ``[-1, 1]``."""
+    return np.load(path).astype(np.float32) / 32768.0
 
 
 def track_path(processed_dir: Path, track_id: int) -> Path:
