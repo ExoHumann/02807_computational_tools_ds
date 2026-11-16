@@ -11,7 +11,9 @@
 * The project uses `ruff` for linting and formatting:
     * To format code, use `uv run ruff format .`.
     * To lint code, use `uv run ruff check . --fix`.
-* The project uses `invoke` for task management (`test`, `lint`, `fmt`). To see available tasks, use
+* To download and process the dataset, use `uv run python -m afp.data --subset medium [--limit N]`
+    (or `uv run invoke data`). It is resumable; do not run it unless asked, it downloads about 22 GB.
+* The project uses `invoke` for task management (`test`, `data`, `fmt`). To see available tasks, use
     `uv run invoke --list` or refer to the `tasks.py` file.
 * The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
     `uv run pre-commit run --all-files`. For more information, refer to the `.pre-commit-config.yaml` file.
