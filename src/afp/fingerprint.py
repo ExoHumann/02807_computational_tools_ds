@@ -11,7 +11,7 @@ Tracks are split into a training part (used only to build the pairs the head lea
 reference database.
 
 Outputs under ``data/processed``: ``embeddings/{clean,pairs,queries}/shard_*.npz`` (cached MuQ features) and
-``fingerprints/{references,queries}.npz`` (the fingerprints). The trained head goes to ``models/head.pt``.
+``fingerprints/{references,queries}.npz`` (the fingerprints). The trained head goes to ``models/projection_head.pt``.
 """
 
 import argparse
@@ -304,7 +304,7 @@ def main(argv: list[str] | None = None) -> None:
     """Command line entry point with the subcommands ``cache``, ``train`` and ``encode``."""
     parser = argparse.ArgumentParser(description="Produce fingerprints from the processed audio.")
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
-    parser.add_argument("--model", type=Path, default=Path("models/head.pt"))
+    parser.add_argument("--model", type=Path, default=Path("models/projection_head.pt"))
     parser.add_argument("--seed", type=int, default=0)
     commands = parser.add_subparsers(dest="command", required=True)
 

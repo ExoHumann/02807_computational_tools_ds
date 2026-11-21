@@ -186,3 +186,7 @@ data/**
 *.npy
 *.npz
 *.parquet
+
+# HPC job output and trained weights (shared via GitHub releases)
+hpc/logs/
+models/*.pt

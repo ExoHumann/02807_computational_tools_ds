@@ -29,6 +29,7 @@ dependencies = [
     "soundfile>=0.12",
     "torch==2.6.0",
     "torchaudio==2.6.0",
+    "torchvision==0.21.0",
     "tqdm>=4.66",
     "transformers>=4.46,<5",
     "x-clip>=0.15.0",
@@ -44,17 +45,23 @@ dev = [
 ]
 
 
+[tool.uv]
+environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cpu" },
+    { index = "pytorch-cu118" },
 ]
 torchaudio = [
-    { index = "pytorch-cpu" },
+    { index = "pytorch-cu118" },
+]
+torchvision = [
+    { index = "pytorch-cu118" },
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
 explicit = true
 
 [tool.ruff]

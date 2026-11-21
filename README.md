@@ -38,11 +38,12 @@ quick trial run.
 
 Output: `data/processed/fingerprints/references.npz` (`vectors` as `float32 [N, 256]` with unit norm, plus
 `track_id`, `segment_idx`, `start_s`) and `queries.npz` (the same plus the `augmentation` category). The head is saved
-to `models/head.pt`.
+to `models/projection_head.pt`.
 
 Speed: on CPU MuQ takes about 1.6 s per window (measured here), so `cache` with the defaults (about 153,000 windows)
-would take roughly three days. It needs a GPU, which means a CUDA build of torch (`pyproject.toml` currently pins the
-CPU build).
+would take roughly three days. It needs a GPU: `pyproject.toml` installs the CUDA 11.8 build of torch. On a DTU HPC
+V100 it took about 0.07 s per window, and the full run on FMA `small` (`hpc/setup_small.sh`, then `hpc/run_small.sh`)
+took about 1.5 hours.
 
 Differences from the paper: noise and reverb are synthetic instead of MUSAN and Aachen recordings, there is no
 Encodec compression, and the open MuQ checkpoint was trained on the Million Song Dataset, so it may not reproduce the

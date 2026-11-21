@@ -45,10 +45,12 @@ def test_fingerprint_pipeline_end_to_end(tmp_path):
     cache_clean(manifest, tmp_path, backbone, batch_size=4, tracks_per_shard=3)
     cache_clips("pairs", manifest, train_ids, 12, tmp_path, backbone, True, seed=0, batch_size=4, clips_per_shard=6)
     cache_clips("queries", manifest, eval_ids, 6, tmp_path, backbone, False, seed=1, batch_size=4, clips_per_shard=6)
-    history = train(tmp_path, tmp_path / "head.pt", hidden_dim=64, out_dim=16, epochs=2, batch_size=4, device="cpu")
+    history = train(
+        tmp_path, tmp_path / "projection_head.pt", hidden_dim=64, out_dim=16, epochs=2, batch_size=4, device="cpu"
+    )
     assert len(history) == 2
 
-    table = encode(tmp_path, tmp_path / "head.pt", device="cpu")
+    table = encode(tmp_path, tmp_path / "projection_head.pt", device="cpu")
     assert table.loc["overall", "n"] == 6 and 0.0 <= table.loc["overall", "top1"] <= 1.0
     references = np.load(tmp_path / "fingerprints" / "references.npz")
     assert references["vectors"].shape == (24, 16)
