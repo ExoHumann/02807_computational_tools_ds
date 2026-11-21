@@ -12,7 +12,7 @@ from afp.augment import (
     augment,
 )
 from afp.data import SAMPLE_RATE, track_path
-from afp.fingerprint import cache_clean, cache_clips, encode, split_tracks, train
+from afp.fingerprint import cache_clean, cache_clips, encode, search, split_tracks, train, unknown_song_table
 
 
 class FakeBackbone:
@@ -105,6 +105,7 @@ def test_fingerprint_pipeline_end_to_end(tmp_path):
     tables = encode(tmp_path, tmp_path / "projection_head.pt", device="cpu", out_name="fingerprints")
     assert tables["queries"].loc["overall", "n"] == 6 and 0.0 <= tables["queries"].loc["overall", "top1"] <= 1.0
     assert tables["queries_tiktok"].loc["overall", "n"] == 4
+    assert list(tables["queries_unknown"].columns) == ["found", "false_match"]
     tiktok = np.load(tmp_path / "fingerprints" / "queries_tiktok.npz")
     assert tiktok["vectors"].shape == (4, 16)
     is_voice = np.char.find(tiktok["augmentation"], "voice_over") >= 0
@@ -112,3 +113,29 @@ def test_fingerprint_pipeline_end_to_end(tmp_path):
     references = np.load(tmp_path / "fingerprints" / "references.npz")
     assert references["vectors"].shape == (24, 16)
     np.testing.assert_allclose(np.linalg.norm(references["vectors"], axis=1), 1.0, atol=1e-5)
+
+
+def test_search_rejects_below_threshold_and_unknown_table_counts_removed_tracks():
+    references = np.eye(4, dtype=np.float32)
+    reference_track = np.array([10, 10, 20, 30])
+    queries = np.array([[1, 0, 0, 0], [0, 0, 0.6, 0.8]], dtype=np.float32)
+    track, score = search(references, reference_track, queries, threshold=0.9)
+    assert track.tolist() == [10, -1] and np.allclose(score, [1.0, 0.8])
+    table = unknown_song_table(references, reference_track, queries, np.array([10, 30]), thresholds=(0.5, 0.9))
+    assert set(table.columns) == {"found", "false_match"} and table.index.tolist() == [0.5, 0.9]
+
+
+def test_cache_clean_adds_rms_to_old_shards_without_the_backbone(tmp_path):
+    t = np.arange(12 * SAMPLE_RATE) / SAMPLE_RATE
+    audio = np.concatenate([np.zeros(10 * SAMPLE_RATE), np.sin(2 * np.pi * 440 * t)])
+    path = track_path(tmp_path, 1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, (audio * 20_000).astype(np.int16))
+    manifest = pd.DataFrame([{"track_id": 1, "path": path.relative_to(tmp_path).as_posix()}])
+    cache_clean(manifest, tmp_path, FakeBackbone())
+    shard = tmp_path / "embeddings" / "clean" / "shard_0000.npz"
+    old = {key: value for key, value in np.load(shard).items() if key != "rms"}
+    np.savez(shard, **old)
+    cache_clean(manifest, tmp_path, backbone=None)
+    rms = np.load(shard)["rms"]
+    assert len(rms) == len(old["embeddings"]) and rms[0] < 1e-3 < rms[-1]

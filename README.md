@@ -18,7 +18,8 @@ uv run python -m afp.data --subset small --limit 50 # quick test on the first 50
 ```
 
 The fingerprints, the trained head and `manifest.csv` for `small` are published as the GitHub release
-`v0.1-fingerprints`, so the audio is only needed to fingerprint new clips or re-run the pipeline.
+`v0.2-fingerprints` (head trained with voice-over; `v0.1-fingerprints` has the first head), so the audio is only
+needed to fingerprint new clips or re-run the pipeline.
 
 The download is resumable and checked against the published SHA-1. Each clip is decoded straight from the zip to
 24 kHz mono int16 and saved as `data/processed/audio/<NNN>/<track_id>.npy`. Re-running skips finished tracks.
@@ -42,8 +43,14 @@ so the head is never scored on tracks it learned from. Use `cache --limit-tracks
 quick trial run.
 
 Output: `data/processed/fingerprints/references.npz` (`vectors` as `float32 [N, 256]` with unit norm, plus
-`track_id`, `segment_idx`, `start_s`) and `queries.npz` (the same plus the `augmentation` category). The head is saved
-to `models/projection_head.pt`.
+`track_id`, `segment_idx`, `start_s`, `rms`) and `queries.npz` (the same plus the `augmentation` category). The head is
+saved to `models/projection_head.pt`. `encode` drops near-silent reference windows (`--min-rms`, default 0.001; 34 in
+`small`), because every silent window gets the same fingerprint and would match silent windows of other tracks.
+
+`afp.fingerprint.search(references, track_id, queries, threshold)` returns the best track per query, or `-1` when the
+best cosine similarity is below `threshold` ("song not in the database"). `encode` also reports, for a range of
+thresholds, how many queries are still found and how many queries of songs missing from the references (half of the
+query tracks, removed for this test) are wrongly matched. Around 0.7 is a reasonable default.
 
 Speed: on CPU MuQ takes about 1.6 s per window (measured here), so `cache` with the defaults (about 153,000 windows)
 would take roughly three days. It needs a GPU: `pyproject.toml` installs the CUDA 11.8 build of torch. On a DTU HPC
@@ -55,14 +62,19 @@ kept), both combined, coloured noise, reverb, reverb plus noise, band-, high- an
 synthetic stand-ins chosen to need no extra downloads, and they are used both for training and for the standard
 queries.
 
-TikTok-like test queries: three further distortions are used only for evaluation, never for training, to measure
-robustness to distortions the head has not seen: sped-up playback (1.1x to 1.5x, pitch rises too), voice-over (real
-speech from LibriSpeech `dev-clean`, CC BY 4.0, mixed at -5 to +10 dB music-to-speech) and MP3 compression (about 27
-to 40 kbit/s), each alone and all three combined. They still do not cover real phone microphones or TikTok's own
-processing.
+TikTok-like test queries: three further distortions build held-out queries: sped-up playback (1.1x to 1.5x, pitch
+rises too), voice-over (real speech from LibriSpeech, CC BY 4.0, mixed at -5 to +10 dB music-to-speech; the level is
+saved per query as `voice_over_db`) and MP3 compression (about 27 to 40 kbit/s), each alone and all three combined.
+They still do not cover real phone microphones or TikTok's own processing.
+
+Voice-over can also be added to training (`cache --voice-over`). Training speech comes from LibriSpeech
+`train-clean-100` and test speech from `dev-clean`; LibriSpeech splits have disjoint speakers, so no test voice is
+heard during training. Sped-up playback, compression and the combined category stay unseen.
 
 ```bash
-uv run python -m afp.data --speech                # stream LibriSpeech dev-clean and save 10 s speech chunks
+uv run python -m afp.data --speech train          # 600 speech chunks from 100 train-clean-100 speakers
+uv run python -m afp.data --speech test           # 240 speech chunks from the 40 dev-clean speakers
+uv run python -m afp.fingerprint cache --voice-over --pairs 10000 --queries 2000
 uv run python -m afp.fingerprint cache-tiktok     # MuQ features of 2,000 held-out TikTok-like queries
 uv run python -m afp.fingerprint encode           # also scores queries_tiktok when its features exist
 ```
@@ -71,10 +83,19 @@ Differences from the paper: noise and reverb are synthetic instead of MUSAN (rea
 and Aachen (real room impulse responses), there is no Encodec compression, and the open MuQ checkpoint was trained on
 the Million Song Dataset, so it may not reproduce the paper's numbers. MuQ weights are CC-BY-NC 4.0.
 
-Evaluation so far: every query is a distorted clip of a track in the references, made with the same kinds of
-distortions as the training pairs, from tracks the head never trained on. Exact-search top-1 is 0.981 (per
-distortion 0.959 to 0.995). This measures robustness to known distortions on new songs; it does not cover songs
-missing from the references or real-world recordings.
+Evaluation so far (exact search, FMA `small`, queries from tracks the head never trained on, 2,000 per set):
+
+| Query set | Head v1 | Head v2 (with voice-over) |
+|---|---|---|
+| standard distortions | 0.981 | 0.983 |
+| TikTok-like: compression | 0.986 | 0.989 |
+| TikTok-like: sped up | 0.962 | 0.951 |
+| TikTok-like: voice-over | 0.393 | 0.973 |
+| TikTok-like: all three combined | 0.234 | 0.645 |
+| TikTok-like: overall | 0.651 | 0.899 |
+
+With a 0.7 threshold, head v2 finds 0.925 of standard and 0.668 of TikTok-like queries whose song is in the
+references, and wrongly accepts 0.050 and 0.034 of queries whose song is not. Real-world recordings are not covered.
 
 ## Layout
 

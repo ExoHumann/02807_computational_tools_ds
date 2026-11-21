@@ -34,6 +34,8 @@ from afp.embed import EMBED_DIM, HIDDEN_DIM, MuQBackbone, ProjectionHead, train_
 EMBEDDINGS_DIR = "embeddings"
 FINGERPRINTS_DIR = "fingerprints"
 QUERY_KINDS = ("queries", "queries_tiktok")
+MIN_RMS = 1e-3
+UNKNOWN_THRESHOLDS = (0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9)
 
 
 def split_tracks(track_ids: pd.Series, train_frac: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
@@ -95,7 +97,9 @@ def cache_clean(
 ) -> None:
     """Embed every clean 10 s window (5 s hop) of every track and save the features in shards.
 
-    Finished shards are skipped. Delete ``embeddings/clean`` to start over with different settings.
+    Each window's RMS level is stored too, so near-silent windows can be dropped later. Finished shards are skipped;
+    a finished shard without RMS levels gets them added from the audio, without running the backbone again. Delete
+    ``embeddings/clean`` to start over with different settings.
 
     Args:
         manifest: Table with ``track_id`` and ``path`` (relative to ``processed_dir``).
@@ -107,7 +111,8 @@ def cache_clean(
     out_dir = Path(processed_dir) / EMBEDDINGS_DIR / "clean"
     for shard, first in enumerate(tqdm(range(0, len(manifest), tracks_per_shard), desc="clean windows")):
         path = out_dir / f"shard_{shard:04d}.npz"
-        if path.exists():
+        existing = dict(np.load(path)) if path.exists() else None
+        if existing is not None and "rms" in existing:
             continue
         windows, track_id, segment_idx, start_s = [], [], [], []
         for row in manifest.iloc[first : first + tracks_per_shard].itertuples():
@@ -116,12 +121,18 @@ def cache_clean(
             track_id += [row.track_id] * len(segments)
             segment_idx += range(len(segments))
             start_s += starts.tolist()
+        windows = np.concatenate(windows)
+        rms = np.sqrt(np.mean(windows**2, axis=1)).astype(np.float32)
+        if existing is not None:
+            _save_shard(path, **existing, rms=rms)
+            continue
         _save_shard(
             path,
-            embeddings=_embed(backbone, np.concatenate(windows), batch_size).astype(np.float16),
+            embeddings=_embed(backbone, windows, batch_size).astype(np.float16),
             track_id=np.array(track_id, dtype=np.int32),
             segment_idx=np.array(segment_idx, dtype=np.int16),
             start_s=np.array(start_s, dtype=np.float32),
+            rms=rms,
         )
 
 
@@ -229,7 +240,7 @@ def train(
 
 def load_head(model_path: Path) -> ProjectionHead:
     """Load a head saved by :func:`train` in evaluation mode."""
-    saved = torch.load(model_path)
+    saved = torch.load(model_path, map_location="cpu")
     head = ProjectionHead(saved["in_dim"], saved["hidden_dim"], saved["out_dim"])
     head.load_state_dict(saved["state_dict"])
     return head.eval()
@@ -244,6 +255,35 @@ def _apply_head(head: ProjectionHead, embeddings: np.ndarray, device: str, batch
             for i in range(0, len(embeddings), batch_size)
         ]
     return np.concatenate(batches)
+
+
+def search(
+    references: np.ndarray,
+    reference_track: np.ndarray,
+    queries: np.ndarray,
+    threshold: float | None = None,
+    chunk: int = 256,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Exact nearest-neighbour search: the track of the most similar reference window for each query.
+
+    Args:
+        references: Unit-norm reference fingerprints, shape ``[n, dim]``.
+        reference_track: Track id of each reference fingerprint.
+        queries: Unit-norm query fingerprints, shape ``[m, dim]``.
+        threshold: Minimum cosine similarity to accept a match. Queries below it get track ``-1`` ("not found").
+        chunk: Queries searched at a time, to bound memory.
+
+    Returns:
+        A tuple ``(track, score)``: the predicted track id (``-1`` if rejected) and the best cosine similarity.
+    """
+    best = np.concatenate(
+        [(queries[i : i + chunk] @ references.T).argmax(axis=1) for i in range(0, len(queries), chunk)]
+    )
+    score = np.einsum("ij,ij->i", queries, references[best])
+    track = reference_track[best].copy()
+    if threshold is not None:
+        track[score < threshold] = -1
+    return track, score
 
 
 def top1_hit_rate(
@@ -267,30 +307,73 @@ def top1_hit_rate(
     Returns:
         A table indexed by distortion category plus ``overall`` with the query count ``n`` and the hit rate ``top1``.
     """
-    predicted = np.concatenate(
-        [reference_track[(queries[i : i + chunk] @ references.T).argmax(axis=1)] for i in range(0, len(queries), chunk)]
-    )
+    predicted, _ = search(references, reference_track, queries, chunk=chunk)
     hits = pd.DataFrame({"label": labels, "hit": predicted == query_track})
     table = hits.groupby("label")["hit"].agg(n="size", top1="mean")
     table.loc["overall"] = [len(hits), hits["hit"].mean()]
     return table
 
 
-def encode(
-    processed_dir: Path, model_path: Path, device: str | None = None, out_name: str = FINGERPRINTS_DIR
-) -> dict[str, pd.DataFrame]:
-    """Turn the cached features into fingerprints, save them, and report exact-search top-1 per distortion.
+def unknown_song_table(
+    references: np.ndarray,
+    reference_track: np.ndarray,
+    queries: np.ndarray,
+    query_track: np.ndarray,
+    thresholds: tuple[float, ...] = UNKNOWN_THRESHOLDS,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Simulate songs missing from the database by removing half of the query tracks from the references.
 
-    Every query set in ``QUERY_KINDS`` that has cached features is encoded and scored.
+    Args:
+        references: Unit-norm reference fingerprints, shape ``[n, dim]``.
+        reference_track: Track id of each reference fingerprint.
+        queries: Unit-norm query fingerprints, shape ``[m, dim]``.
+        query_track: Source track id of each query.
+        thresholds: Similarity thresholds to evaluate.
+        seed: Seed for choosing the removed tracks.
+
+    Returns:
+        A table indexed by threshold with ``found`` (share of queries whose track is still in the references that are
+        matched correctly and accepted) and ``false_match`` (share of the other queries that are wrongly accepted).
+    """
+    query_tracks = np.unique(query_track)
+    removed = np.random.default_rng(seed).choice(query_tracks, len(query_tracks) // 2, replace=False)
+    keep = ~np.isin(reference_track, removed)
+    predicted, score = search(references[keep], reference_track[keep], queries)
+    known = ~np.isin(query_track, removed)
+    rows = {
+        t: {
+            "found": np.mean((predicted == query_track)[known] & (score[known] >= t)),
+            "false_match": np.mean(score[~known] >= t),
+        }
+        for t in thresholds
+    }
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("threshold")
+
+
+def encode(
+    processed_dir: Path,
+    model_path: Path,
+    device: str | None = None,
+    out_name: str = FINGERPRINTS_DIR,
+    min_rms: float = MIN_RMS,
+) -> dict[str, pd.DataFrame]:
+    """Turn the cached features into fingerprints, save them, and report exact-search results per query set.
+
+    Near-silent reference windows are dropped: every silent window gets the same fingerprint, so they would match each
+    other across tracks. Every query set in ``QUERY_KINDS`` that has cached features is encoded and scored, both as
+    top-1 per distortion and with half of its tracks removed from the references (see :func:`unknown_song_table`).
 
     Args:
         processed_dir: Directory holding ``embeddings/clean`` and at least ``embeddings/queries``.
         model_path: Head saved by :func:`train`.
         device: Device for the head. Defaults to CUDA when available.
         out_name: Folder below ``processed_dir`` for the fingerprints, so heads can be compared side by side.
+        min_rms: Reference windows with a lower RMS level are dropped. Ignored for shards without RMS levels.
 
     Returns:
-        A dict mapping each query set name to its table from :func:`top1_hit_rate`.
+        A dict mapping ``<query set>`` to its :func:`top1_hit_rate` table and ``<query set>_unknown`` to its
+        :func:`unknown_song_table`.
     """
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     head = load_head(model_path)
@@ -298,13 +381,15 @@ def encode(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     clean = load_shards(Path(processed_dir) / EMBEDDINGS_DIR / "clean")
+    if "rms" in clean:
+        loud = clean["rms"] >= min_rms
+        print(f"dropped {np.sum(~loud)} near-silent reference windows (rms < {min_rms:g})")
+        clean = {key: value[loud] for key, value in clean.items()}
     references = _apply_head(head, clean["embeddings"], device)
     np.savez(
         out_dir / "references.npz",
         vectors=references,
-        track_id=clean["track_id"],
-        segment_idx=clean["segment_idx"],
-        start_s=clean["start_s"],
+        **{key: clean[key] for key in ("track_id", "segment_idx", "start_s", "rms") if key in clean},
     )
     tables = {}
     for kind in QUERY_KINDS:
@@ -323,6 +408,9 @@ def encode(
         )
         tables[kind] = top1_hit_rate(
             references, clean["track_id"], query_vectors, queries["track_id"], queries["augmentation"]
+        )
+        tables[f"{kind}_unknown"] = unknown_song_table(
+            references, clean["track_id"], query_vectors, queries["track_id"]
         )
     return tables
 
@@ -361,6 +449,7 @@ def main(argv: list[str] | None = None) -> None:
     encoding = commands.add_parser("encode", help="write fingerprints and report exact-search top-1")
     encoding.add_argument("--device", default=None)
     encoding.add_argument("--out-dir", default=FINGERPRINTS_DIR, help="folder below data/processed for the output")
+    encoding.add_argument("--min-rms", type=float, default=MIN_RMS, help="drop quieter reference windows")
 
     args = parser.parse_args(argv)
     processed_dir = args.data_dir / "processed"
@@ -425,7 +514,7 @@ def main(argv: list[str] | None = None) -> None:
         for epoch, (train_loss, val_loss) in enumerate(history, start=1):
             print(f"epoch {epoch:3d}  train {train_loss:.4f}  val {val_loss:.4f}")
     else:
-        for kind, table in encode(processed_dir, args.model, args.device, args.out_dir).items():
+        for kind, table in encode(processed_dir, args.model, args.device, args.out_dir, args.min_rms).items():
             print(f"{kind}:\n{table.to_string(float_format=lambda x: f'{x:.3f}')}\n")
 
 
