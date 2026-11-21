@@ -1,6 +1,6 @@
 """Data pipeline: download FMA, decode it to 24 kHz mono int16 ``.npy`` files and build a manifest.
 
-Run ``uv run python -m afp.data --subset medium`` to download into ``data/raw`` and process into ``data/processed``.
+Run ``uv run python -m afp.data --subset small`` to download into ``data/raw`` and process into ``data/processed``.
 """
 
 import argparse
@@ -8,6 +8,7 @@ import hashlib
 import http.client
 import io
 import os
+import tarfile
 import urllib.request
 import zipfile
 from concurrent.futures import ProcessPoolExecutor
@@ -31,6 +32,12 @@ FMA_SHA1 = {
     "fma_small.zip": "ade154f733639d52e35e32f5593efe5be76c6d70",
     "fma_medium.zip": "c67b69ea232021025fca9231fc1c7c1a063ab50b",
 }
+SPEECH_URLS = {
+    "train": "https://www.openslr.org/resources/12/train-clean-100.tar.gz",
+    "test": "https://www.openslr.org/resources/12/dev-clean.tar.gz",
+}
+SPEECH_FILES = {"train": "speech_train.npy", "test": "speech_test.npy"}
+SPEECH_MAX_SPEAKERS = 100
 CHUNK_BYTES = 1 << 20
 MAX_RETRIES = 5
 
@@ -221,6 +228,56 @@ def process_zip(
     return pd.DataFrame(skipped, columns=["track_id", "reason"])
 
 
+def build_speech_bank(
+    source: BinaryIO,
+    seconds_per_speaker: float = 60.0,
+    chunk_s: float = SEGMENT_S,
+    max_speakers: int | None = None,
+) -> np.ndarray:
+    """Cut LibriSpeech utterances into fixed-length speech chunks for the ``voice_over`` distortion.
+
+    The archive is read as a stream, so it can come straight from an HTTP response. At most ``seconds_per_speaker``
+    of audio is kept per speaker so the chunks cover many voices. LibriSpeech splits have disjoint speakers, so the
+    training and test chunks never share a voice.
+
+    Args:
+        source: A LibriSpeech ``.tar.gz`` archive opened for binary reading.
+        seconds_per_speaker: Maximum audio kept per speaker.
+        chunk_s: Chunk length in seconds.
+        max_speakers: Stop reading once this many speakers have been collected. Archives are ordered by speaker,
+            so this avoids downloading all of a large split.
+
+    Returns:
+        A ``float32`` array of shape ``[n_chunks, chunk_samples]`` at 24 kHz.
+    """
+    chunk, cap = round(chunk_s * SAMPLE_RATE), round(seconds_per_speaker * SAMPLE_RATE)
+    parts: dict[str, list[np.ndarray]] = {}
+    lengths: dict[str, int] = {}
+    with tarfile.open(fileobj=source, mode="r|gz") as tar:
+        for member in tar:
+            if not member.name.endswith(".flac"):
+                continue
+            speaker = Path(member.name).name.split("-")[0]
+            if max_speakers is not None and speaker not in parts and len(parts) >= max_speakers:
+                break
+            if lengths.get(speaker, 0) >= cap:
+                continue
+            waveform = load_audio(io.BytesIO(tar.extractfile(member).read()))
+            parts.setdefault(speaker, []).append(waveform)
+            lengths[speaker] = lengths.get(speaker, 0) + len(waveform)
+    chunks = []
+    for pieces in parts.values():
+        audio = np.concatenate(pieces)[:cap]
+        n = len(audio) // chunk
+        chunks.extend(audio[: n * chunk].reshape(n, chunk))
+    return np.stack(chunks)
+
+
+def load_speech_bank(path: Path) -> np.ndarray:
+    """Load the speech chunks written by ``python -m afp.data --speech {train,test}`` as ``float32`` in ``[-1, 1]``."""
+    return np.load(path).astype(np.float32) / 32768.0
+
+
 def load_track_metadata(metadata_zip: Path) -> pd.DataFrame:
     """Read title, artist and top-level genre of every track from ``fma_metadata.zip``.
 
@@ -277,14 +334,28 @@ def build_manifest(processed_dir: Path, metadata_zip: Path | None = None) -> pd.
 def main(argv: list[str] | None = None) -> None:
     """Command line entry point: download FMA, process it and write ``manifest.csv`` and ``skipped.csv``."""
     parser = argparse.ArgumentParser(description="Download FMA and process it to 24 kHz mono int16 .npy files.")
-    parser.add_argument("--subset", choices=["small", "medium"], default="medium")
+    parser.add_argument("--subset", choices=["small", "medium"], default="small")
     parser.add_argument("--limit", type=int, default=None, help="process only the first N tracks")
     parser.add_argument("--workers", type=int, default=None, help="worker processes (default: CPU count - 1)")
     parser.add_argument("--skip-download", action="store_true", help="use the zips already in data/raw")
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument(
+        "--speech",
+        choices=["train", "test"],
+        default=None,
+        help="only build LibriSpeech voice-over chunks for this split",
+    )
     args = parser.parse_args(argv)
 
     raw_dir, processed_dir = args.data_dir / "raw", args.data_dir / "processed"
+    if args.speech:
+        with urllib.request.urlopen(SPEECH_URLS[args.speech], timeout=60) as response:
+            speech = build_speech_bank(response, max_speakers=SPEECH_MAX_SPEAKERS)
+        out = processed_dir / SPEECH_FILES[args.speech]
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        np.save(out, np.round(np.clip(speech, -1.0, 1.0) * 32767).astype(np.int16))
+        print(f"{len(speech)} speech chunks written to {out}")
+        return
     audio_name = f"fma_{args.subset}.zip"
     if not args.skip_download:
         for name in ("fma_metadata.zip", audio_name):

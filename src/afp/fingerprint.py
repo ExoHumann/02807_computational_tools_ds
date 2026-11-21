@@ -6,12 +6,16 @@ Each step is a subcommand and is resumable:
     uv run python -m afp.fingerprint train    # contrastive training of the head on the cached pairs
     uv run python -m afp.fingerprint encode   # fingerprints for every window and query, plus exact-search top-1
 
+Optionally, ``cache --voice-over`` (after ``python -m afp.data --speech train``) adds voice-over to the training pairs,
+and ``cache-tiktok`` (after ``python -m afp.data --speech test``) adds held-out queries with TikTok-like distortions
+(sped-up playback, voice-over by speakers never heard in training, MP3 compression).
+
 Tracks are split into a training part (used only to build the pairs the head learns from) and an evaluation part
 (the source of the queries), so the head is never scored on tracks it was trained on. All tracks are in the
 reference database.
 
-Outputs under ``data/processed``: ``embeddings/{clean,pairs,queries}/shard_*.npz`` (cached MuQ features) and
-``fingerprints/{references,queries}.npz`` (the fingerprints). The trained head goes to ``models/projection_head.pt``.
+Outputs under ``data/processed``: ``embeddings/{clean,pairs,queries,queries_tiktok}/shard_*.npz`` (cached MuQ
+features) and ``fingerprints/{references,queries,queries_tiktok}.npz`` (the fingerprints). The trained head goes to ``models/projection_head.pt``.
 """
 
 import argparse
@@ -23,12 +27,13 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
-from afp.augment import random_augment
-from afp.data import SAMPLE_RATE, SEGMENT_S, load_processed, segment
+from afp.augment import CATEGORIES, TEST_CATEGORIES, VOICE_CATEGORIES, random_augment
+from afp.data import SAMPLE_RATE, SEGMENT_S, SPEECH_FILES, load_processed, load_speech_bank, segment
 from afp.embed import EMBED_DIM, HIDDEN_DIM, MuQBackbone, ProjectionHead, train_head
 
 EMBEDDINGS_DIR = "embeddings"
 FINGERPRINTS_DIR = "fingerprints"
+QUERY_KINDS = ("queries", "queries_tiktok")
 
 
 def split_tracks(track_ids: pd.Series, train_frac: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
@@ -131,6 +136,8 @@ def cache_clips(
     seed: int,
     batch_size: int = 4,
     clips_per_shard: int = 100,
+    categories: tuple[tuple[str, ...], ...] = CATEGORIES,
+    speech: np.ndarray | None = None,
 ) -> None:
     """Cut random 10 s clips, distort each one and save the MuQ features of the distorted (and optionally clean) clip.
 
@@ -139,7 +146,8 @@ def cache_clips(
     interrupted run can be repeated. Delete ``embeddings/<kind>`` to start over with different settings.
 
     Args:
-        kind: Output folder name below ``embeddings``: ``"pairs"`` for training or ``"queries"`` for evaluation.
+        kind: Output folder name below ``embeddings``: ``"pairs"`` for training, ``"queries"`` or
+            ``"queries_tiktok"`` for evaluation.
         manifest: Table with ``track_id`` and ``path`` (relative to ``processed_dir``).
         track_ids: Tracks the clips are drawn from.
         n_clips: Number of clips.
@@ -149,6 +157,8 @@ def cache_clips(
         seed: Base seed.
         batch_size: Windows per backbone call.
         clips_per_shard: Clips per output file.
+        categories: Distortion categories to draw from (see :func:`afp.augment.random_augment`).
+        speech: Speech chunks, needed when a category includes ``voice_over``.
     """
     paths = manifest.set_index("track_id")["path"]
     window = round(SEGMENT_S * SAMPLE_RATE)
@@ -159,12 +169,13 @@ def cache_clips(
             continue
         rng = np.random.default_rng([seed, shard])
         count = min(clips_per_shard, n_clips - shard * clips_per_shard)
-        clean, distorted, track_id, start_s, labels = [], [], [], [], []
+        clean, distorted, track_id, start_s, labels, voice_db = [], [], [], [], [], []
         while len(distorted) < count:
             chosen = int(rng.choice(track_ids))
             track = load_processed(Path(processed_dir) / paths[chosen])
             start = int(rng.integers(0, len(track) - window + 1))
-            audio, rate, label = random_augment(track, rng, SAMPLE_RATE)
+            record: dict[str, float] = {}
+            audio, rate, label = random_augment(track, rng, SAMPLE_RATE, categories, speech, record)
             distorted_start = round(start / rate)
             if distorted_start + window > len(audio):
                 continue
@@ -173,11 +184,13 @@ def cache_clips(
             track_id.append(chosen)
             start_s.append(start / SAMPLE_RATE)
             labels.append(label)
+            voice_db.append(record.get("voice_over_db", np.nan))
         arrays = {
             "distorted": _embed(backbone, np.stack(distorted), batch_size).astype(np.float16),
             "track_id": np.array(track_id, dtype=np.int32),
             "start_s": np.array(start_s, dtype=np.float32),
             "augmentation": np.array(labels),
+            "voice_over_db": np.array(voice_db, dtype=np.float32),
         }
         if with_clean:
             arrays["clean"] = _embed(backbone, np.stack(clean), batch_size).astype(np.float16)
@@ -263,20 +276,25 @@ def top1_hit_rate(
     return table
 
 
-def encode(processed_dir: Path, model_path: Path, device: str | None = None) -> pd.DataFrame:
+def encode(
+    processed_dir: Path, model_path: Path, device: str | None = None, out_name: str = FINGERPRINTS_DIR
+) -> dict[str, pd.DataFrame]:
     """Turn the cached features into fingerprints, save them, and report exact-search top-1 per distortion.
 
+    Every query set in ``QUERY_KINDS`` that has cached features is encoded and scored.
+
     Args:
-        processed_dir: Directory holding ``embeddings/clean`` and ``embeddings/queries``.
+        processed_dir: Directory holding ``embeddings/clean`` and at least ``embeddings/queries``.
         model_path: Head saved by :func:`train`.
         device: Device for the head. Defaults to CUDA when available.
+        out_name: Folder below ``processed_dir`` for the fingerprints, so heads can be compared side by side.
 
     Returns:
-        The table from :func:`top1_hit_rate`.
+        A dict mapping each query set name to its table from :func:`top1_hit_rate`.
     """
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     head = load_head(model_path)
-    out_dir = Path(processed_dir) / FINGERPRINTS_DIR
+    out_dir = Path(processed_dir) / out_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     clean = load_shards(Path(processed_dir) / EMBEDDINGS_DIR / "clean")
@@ -288,16 +306,25 @@ def encode(processed_dir: Path, model_path: Path, device: str | None = None) -> 
         segment_idx=clean["segment_idx"],
         start_s=clean["start_s"],
     )
-    queries = load_shards(Path(processed_dir) / EMBEDDINGS_DIR / "queries")
-    query_vectors = _apply_head(head, queries["distorted"], device)
-    np.savez(
-        out_dir / "queries.npz",
-        vectors=query_vectors,
-        track_id=queries["track_id"],
-        start_s=queries["start_s"],
-        augmentation=queries["augmentation"],
-    )
-    return top1_hit_rate(references, clean["track_id"], query_vectors, queries["track_id"], queries["augmentation"])
+    tables = {}
+    for kind in QUERY_KINDS:
+        if kind != "queries" and not (Path(processed_dir) / EMBEDDINGS_DIR / kind).exists():
+            continue
+        queries = load_shards(Path(processed_dir) / EMBEDDINGS_DIR / kind)
+        query_vectors = _apply_head(head, queries["distorted"], device)
+        extra = {"voice_over_db": queries["voice_over_db"]} if "voice_over_db" in queries else {}
+        np.savez(
+            out_dir / f"{kind}.npz",
+            vectors=query_vectors,
+            track_id=queries["track_id"],
+            start_s=queries["start_s"],
+            augmentation=queries["augmentation"],
+            **extra,
+        )
+        tables[kind] = top1_hit_rate(
+            references, clean["track_id"], query_vectors, queries["track_id"], queries["augmentation"]
+        )
+    return tables
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -314,7 +341,15 @@ def main(argv: list[str] | None = None) -> None:
     cache.add_argument("--pairs", type=int, default=20_000, help="number of training pairs")
     cache.add_argument("--queries", type=int, default=3_000, help="number of evaluation queries")
     cache.add_argument("--batch-size", type=int, default=4, help="windows per MuQ call")
+    cache.add_argument("--voice-over", action="store_true", help="add voice-over (training speakers) to the pairs")
     cache.add_argument("--device", default=None)
+
+    tiktok = commands.add_parser("cache-tiktok", help="extract MuQ features of held-out TikTok-like queries")
+    tiktok.add_argument("--limit-tracks", type=int, default=None, help="use only the first N tracks of the manifest")
+    tiktok.add_argument("--train-frac", type=float, default=0.2, help="must match the value used for cache")
+    tiktok.add_argument("--queries", type=int, default=2_000, help="number of evaluation queries")
+    tiktok.add_argument("--batch-size", type=int, default=4, help="windows per MuQ call")
+    tiktok.add_argument("--device", default=None)
 
     fit = commands.add_parser("train", help="train the projection head on the cached pairs")
     fit.add_argument("--epochs", type=int, default=30)
@@ -325,6 +360,7 @@ def main(argv: list[str] | None = None) -> None:
 
     encoding = commands.add_parser("encode", help="write fingerprints and report exact-search top-1")
     encoding.add_argument("--device", default=None)
+    encoding.add_argument("--out-dir", default=FINGERPRINTS_DIR, help="folder below data/processed for the output")
 
     args = parser.parse_args(argv)
     processed_dir = args.data_dir / "processed"
@@ -336,9 +372,44 @@ def main(argv: list[str] | None = None) -> None:
         train_ids, eval_ids = split_tracks(manifest["track_id"], args.train_frac, args.seed)
         backbone = MuQBackbone(args.device)
         cache_clean(manifest, processed_dir, backbone, args.batch_size)
-        cache_clips("pairs", manifest, train_ids, args.pairs, processed_dir, backbone, True, args.seed, args.batch_size)
+        pair_categories, pair_speech = CATEGORIES, None
+        if args.voice_over:
+            pair_categories = CATEGORIES + VOICE_CATEGORIES
+            pair_speech = load_speech_bank(processed_dir / SPEECH_FILES["train"])
+        cache_clips(
+            "pairs",
+            manifest,
+            train_ids,
+            args.pairs,
+            processed_dir,
+            backbone,
+            True,
+            args.seed,
+            args.batch_size,
+            categories=pair_categories,
+            speech=pair_speech,
+        )
         cache_clips(
             "queries", manifest, eval_ids, args.queries, processed_dir, backbone, False, args.seed + 1, args.batch_size
+        )
+    elif args.command == "cache-tiktok":
+        manifest = pd.read_csv(processed_dir / "manifest.csv")
+        if args.limit_tracks:
+            manifest = manifest.head(args.limit_tracks)
+        _, eval_ids = split_tracks(manifest["track_id"], args.train_frac, args.seed)
+        speech = load_speech_bank(processed_dir / SPEECH_FILES["test"])
+        cache_clips(
+            "queries_tiktok",
+            manifest,
+            eval_ids,
+            args.queries,
+            processed_dir,
+            MuQBackbone(args.device),
+            False,
+            args.seed + 2,
+            args.batch_size,
+            categories=TEST_CATEGORIES,
+            speech=speech,
         )
     elif args.command == "train":
         history = train(
@@ -354,7 +425,8 @@ def main(argv: list[str] | None = None) -> None:
         for epoch, (train_loss, val_loss) in enumerate(history, start=1):
             print(f"epoch {epoch:3d}  train {train_loss:.4f}  val {val_loss:.4f}")
     else:
-        print(encode(processed_dir, args.model, args.device).to_string(float_format=lambda x: f"{x:.3f}"))
+        for kind, table in encode(processed_dir, args.model, args.device, args.out_dir).items():
+            print(f"{kind}:\n{table.to_string(float_format=lambda x: f'{x:.3f}')}\n")
 
 
 if __name__ == "__main__":

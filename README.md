@@ -2,18 +2,23 @@
 
 Project for DTU course 02807 Computational Tools for Data Science. Deadline: 4 December 2026.
 
-This project builds a song identification system, similar to Shazam or Google voice that can recognise a song from a short and possibly distorted TikTok like audio clip. We follow [Robust Neural Audio Fingerprinting using Music Foundation Models](https://arxiv.org/abs/2511.05399), we use a pretrained foundation model (MuQ, the paper's best-performing backbone) to turn short segments of audio into fingerprints i.e: compact vector representations designed to stay similar under distortions such as noise, compression, time-acceleration, background noise etc. To go through this library of fingerprints the idea is to use Locality-Sensitive Hashing (LSH) and try to measure the trade-off between retrieval accuracy and speed against exhaustive search. We finally build a graph of songs that can share matching parts and apply graph clustering (Louvain) to uncover non-obvious connections between tracks, such as remixes covers or samples. The system will be evaluated on real TikTok clips.
+This project builds a song identification system, similar to Shazam or Google voice that can recognise a song from a short and possibly distorted TikTok like audio clip. We follow [Robust Neural Audio Fingerprinting using Music Foundation Models](https://arxiv.org/abs/2511.05399), we use a pretrained foundation model (MuQ, the paper's best-performing backbone) to turn short segments of audio into fingerprints i.e: compact vector representations designed to stay similar under distortions such as noise, compression, time-acceleration, background noise etc. To go through this library of fingerprints the idea is to use Locality-Sensitive Hashing (LSH) and try to measure the trade-off between retrieval accuracy and speed against exhaustive search. We finally build a graph of songs that can share matching parts and apply graph clustering (Louvain) to uncover non-obvious connections between tracks, such as remixes covers or samples. The system is evaluated on clips with synthetic distortions, including a held-out set of TikTok-like distortions (sped-up playback, voice-over, compression) that the model never trains on.
 
 ## Data
 
-We use the [Free Music Archive](https://github.com/mdeff/fma) (FMA) `medium` subset: 25,000 clips of 30 s (mp3) plus
-metadata (Defferrard et al., ISMIR 2017). Audio is under each artist's own licence and meant for research, so it is
-downloaded rather than redistributed. It needs about 22 GB for the zip plus about 36 GB of processed audio.
+We use the [Free Music Archive](https://github.com/mdeff/fma) (FMA) `small` subset: 8,000 clips of 30 s (mp3) plus
+metadata (Defferrard et al., ISMIR 2017). 7,994 decode cleanly; 6 corrupt mp3s are skipped. Audio is under each
+artist's own licence and meant for research, so it is downloaded rather than redistributed. It needs about 7.7 GB for
+the zip plus about 11.5 GB of processed audio. The `medium` subset (25,000 clips, about 22 GB zip plus 36 GB
+processed) works the same way with `--subset medium`.
 
 ```bash
-uv run python -m afp.data --subset medium            # download, then process everything
-uv run python -m afp.data --subset medium --limit 50 # quick test on the first 50 tracks
+uv run python -m afp.data --subset small            # download, then process everything
+uv run python -m afp.data --subset small --limit 50 # quick test on the first 50 tracks
 ```
+
+The fingerprints, the trained head and `manifest.csv` for `small` are published as the GitHub release
+`v0.1-fingerprints`, so the audio is only needed to fingerprint new clips or re-run the pipeline.
 
 The download is resumable and checked against the published SHA-1. Each clip is decoded straight from the zip to
 24 kHz mono int16 and saved as `data/processed/audio/<NNN>/<track_id>.npy`. Re-running skips finished tracks.
@@ -30,7 +35,7 @@ uv run python -m afp.fingerprint train    # contrastive training of the 1024 -> 
 uv run python -m afp.fingerprint encode   # write the fingerprints and print exact-search top-1 per distortion
 ```
 
-Each 30 s clip is cut into 10 s windows with a 5 s hop (about 110,000 windows for the 25,000 tracks). MuQ is frozen;
+Each 30 s clip is cut into 10 s windows with a 5 s hop (35,326 windows for the 7,994 tracks of `small`). MuQ is frozen;
 only the projection head is trained, on pairs of a clean window and a distorted copy of it (`src/afp/augment.py`).
 The tracks are split 20/80: the 20% only provide training pairs, and the evaluation queries come from the other 80%,
 so the head is never scored on tracks it learned from. Use `cache --limit-tracks 200 --pairs 500 --queries 100` for a
@@ -45,9 +50,31 @@ would take roughly three days. It needs a GPU: `pyproject.toml` installs the CUD
 V100 it took about 0.07 s per window, and the full run on FMA `small` (`hpc/setup_small.sh`, then `hpc/run_small.sh`)
 took about 1.5 hours.
 
-Differences from the paper: noise and reverb are synthetic instead of MUSAN and Aachen recordings, there is no
-Encodec compression, and the open MuQ checkpoint was trained on the Million Song Dataset, so it may not reproduce the
-paper's numbers. MuQ weights are CC-BY-NC 4.0.
+Distortions (`src/afp/augment.py`): time stretch (speed changes, pitch kept), pitch shift (up to 5 semitones, speed
+kept), both combined, coloured noise, reverb, reverb plus noise, band-, high- and low-pass filters, and echo. They are
+synthetic stand-ins chosen to need no extra downloads, and they are used both for training and for the standard
+queries.
+
+TikTok-like test queries: three further distortions are used only for evaluation, never for training, to measure
+robustness to distortions the head has not seen: sped-up playback (1.1x to 1.5x, pitch rises too), voice-over (real
+speech from LibriSpeech `dev-clean`, CC BY 4.0, mixed at -5 to +10 dB music-to-speech) and MP3 compression (about 27
+to 40 kbit/s), each alone and all three combined. They still do not cover real phone microphones or TikTok's own
+processing.
+
+```bash
+uv run python -m afp.data --speech                # stream LibriSpeech dev-clean and save 10 s speech chunks
+uv run python -m afp.fingerprint cache-tiktok     # MuQ features of 2,000 held-out TikTok-like queries
+uv run python -m afp.fingerprint encode           # also scores queries_tiktok when its features exist
+```
+
+Differences from the paper: noise and reverb are synthetic instead of MUSAN (real noise, speech and music recordings)
+and Aachen (real room impulse responses), there is no Encodec compression, and the open MuQ checkpoint was trained on
+the Million Song Dataset, so it may not reproduce the paper's numbers. MuQ weights are CC-BY-NC 4.0.
+
+Evaluation so far: every query is a distorted clip of a track in the references, made with the same kinds of
+distortions as the training pairs, from tracks the head never trained on. Exact-search top-1 is 0.981 (per
+distortion 0.959 to 0.995). This measures robustness to known distortions on new songs; it does not cover songs
+missing from the references or real-world recordings.
 
 ## Layout
 

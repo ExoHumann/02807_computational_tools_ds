@@ -12,7 +12,7 @@ def test(ctx: Context) -> None:
 
 
 @task
-def data(ctx: Context, subset: str = "medium", limit: int = 0) -> None:
+def data(ctx: Context, subset: str = "small", limit: int = 0) -> None:
     """Download FMA and process it (limit=0 processes every track)."""
     limit_flag = f" --limit {limit}" if limit else ""
     ctx.run(f"uv run python -m afp.data --subset {subset}{limit_flag}", echo=True, pty=not WINDOWS)

@@ -1,10 +1,11 @@
 import io
+import tarfile
 import zipfile
 
 import numpy as np
 import soundfile as sf
 
-from afp.data import SAMPLE_RATE, build_manifest, load_audio, process_zip, segment
+from afp.data import SAMPLE_RATE, build_manifest, build_speech_bank, load_audio, process_zip, segment
 
 
 def wav_bytes(seconds: float, rate: int = 44_100, channels: int = 2) -> bytes:
@@ -46,3 +47,20 @@ def test_process_zip_writes_int16_skips_bad_tracks_and_resumes(tmp_path):
     assert (manifest["n_samples"] == 12 * SAMPLE_RATE).all()
     assert np.load(processed / manifest["path"][0]).dtype == np.int16
     assert len(process_zip(zip_path, processed, workers=1)) == 2
+
+
+def test_speech_bank_caps_each_speaker_and_cuts_fixed_chunks():
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w:gz") as tar:
+        for speaker, utterances in (("11", 3), ("22", 1)):
+            for i in range(utterances):
+                buffer = io.BytesIO()
+                sf.write(buffer, np.zeros(16_000 * 7, dtype=np.float32), 16_000, format="FLAC")
+                info = tarfile.TarInfo(f"LibriSpeech/dev-clean/{speaker}/1/{speaker}-1-{i:04d}.flac")
+                info.size = len(buffer.getvalue())
+                tar.addfile(info, io.BytesIO(buffer.getvalue()))
+    archive.seek(0)
+    chunks = build_speech_bank(archive, seconds_per_speaker=15.0, chunk_s=5.0)
+    assert chunks.shape == (3 + 1, 5 * SAMPLE_RATE)
+    archive.seek(0)
+    assert build_speech_bank(archive, seconds_per_speaker=15.0, chunk_s=5.0, max_speakers=1).shape[0] == 3

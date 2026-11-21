@@ -4,12 +4,18 @@ Differences from the paper, since MUSAN, the Aachen room impulse responses and E
     * noise is synthetic coloured noise instead of MUSAN recordings,
     * reverb uses a synthetic exponentially decaying impulse response instead of Aachen RIRs,
     * Encodec compression is not implemented.
+
+``TEST_AUGMENTATIONS`` are TikTok-like distortions (sped-up playback, voice-over, MP3 compression) used for held-out
+queries. ``VOICE_CATEGORIES`` optionally add voice-over to training, with speech from speakers disjoint from the test
+speech, so the test voices are never heard during training.
 """
 
+import io
 import math
 from fractions import Fraction
 
 import numpy as np
+import soundfile as sf
 import torch
 import torchaudio.functional as F
 from scipy.signal import resample_poly
@@ -38,6 +44,20 @@ CATEGORIES = (
     ("echo",),
 )
 
+TEST_AUGMENTATIONS = ("speed_up", "voice_over", "compression")
+
+VOICE_CATEGORIES = (
+    ("voice_over",),
+    ("voice_over", "noise"),
+)
+
+TEST_CATEGORIES = (
+    ("speed_up",),
+    ("voice_over",),
+    ("compression",),
+    ("speed_up", "voice_over", "compression"),
+)
+
 PARAMETER_RANGES = {
     "time_stretch": (0.7, 1.5),
     "pitch_shift": (-5.0, 5.0),
@@ -48,6 +68,9 @@ PARAMETER_RANGES = {
     "high_pass": (1800.0, 3400.0),
     "low_pass": (300.0, 1500.0),
     "echo_delay_s": (0.1, 0.2),
+    "speed_up": (1.1, 1.5),
+    "voice_over_music_to_speech_db": (-5.0, 10.0),
+    "compression_level": (0.5, 0.9),
 }
 
 ECHO_DECAY = 0.5
@@ -120,24 +143,67 @@ def _echo(x: torch.Tensor, rng: np.random.Generator, sample_rate: int) -> torch.
     return x + ECHO_DECAY * delayed
 
 
-def augment(waveform: np.ndarray, name: str, rng: np.random.Generator, sample_rate: int) -> np.ndarray:
+def _speed_up(x: torch.Tensor, rate: float) -> torch.Tensor:
+    """Play faster with the pitch rising too, like a "sped up" song: resample by a small rational ratio."""
+    ratio = Fraction(1.0 / rate).limit_denominator(PITCH_RATIO_DENOMINATOR)
+    return torch.from_numpy(resample_poly(x.numpy(), ratio.numerator, ratio.denominator).astype(np.float32))
+
+
+def _voice_over(x: torch.Tensor, rng: np.random.Generator, speech: np.ndarray) -> tuple[torch.Tensor, float]:
+    """Mix random speech chunks over the whole signal. Returns the mix and the music-to-speech ratio in dB."""
+    pieces = [speech[rng.integers(len(speech))] for _ in range(math.ceil(len(x) / speech.shape[1]))]
+    voice = torch.from_numpy(np.concatenate(pieces)[: len(x)].astype(np.float32))
+    low, high = PARAMETER_RANGES["voice_over_music_to_speech_db"]
+    ratio_db = rng.uniform(low, high)
+    return x + voice * (_rms(x) / _rms(voice) / 10 ** (ratio_db / 20)), ratio_db
+
+
+def _compress(x: torch.Tensor, rng: np.random.Generator, sample_rate: int) -> torch.Tensor:
+    """Encode to MP3 and decode back. Higher ``compression_level`` means a lower bitrate (about 40 to 27 kbit/s)."""
+    buffer = io.BytesIO()
+    sf.write(
+        buffer,
+        x.numpy(),
+        sample_rate,
+        format="MP3",
+        compression_level=rng.uniform(*PARAMETER_RANGES["compression_level"]),
+    )
+    buffer.seek(0)
+    decoded = torch.from_numpy(sf.read(buffer, dtype="float32")[0])
+    out = torch.zeros_like(x)
+    n = min(len(x), len(decoded))
+    out[:n] = decoded[:n]
+    return out
+
+
+def augment(
+    waveform: np.ndarray,
+    name: str,
+    rng: np.random.Generator,
+    sample_rate: int,
+    speech: np.ndarray | None = None,
+    record: dict[str, float] | None = None,
+) -> np.ndarray:
     """Apply one named distortion with parameters drawn from ``PARAMETER_RANGES``.
 
     Ranges are: time stretch factor, pitch shift in semitones, noise SNR in dB and spectral colour, reverb RT60 in
-    seconds, filter cut-offs in Hz (band-pass is the pass band, high- and low-pass the cut-off) and echo delay in
-    seconds. Only ``time_stretch`` changes the length (to ``len / rate``).
+    seconds, filter cut-offs in Hz (band-pass is the pass band, high- and low-pass the cut-off), echo delay in
+    seconds, speed-up factor, voice-over music-to-speech ratio in dB and MP3 compression level. Only ``time_stretch``
+    and ``speed_up`` change the length (to ``len / rate``).
 
     Args:
         waveform: 1D ``float32`` waveform in ``[-1, 1]``.
-        name: One of ``AUGMENTATIONS``.
+        name: One of ``AUGMENTATIONS`` or ``TEST_AUGMENTATIONS``.
         rng: Random generator used to draw the parameters.
         sample_rate: Sample rate of ``waveform`` in Hz.
+        speech: Speech chunks of shape ``[n, samples]`` at ``sample_rate``, needed only for ``voice_over``.
+        record: If given, ``voice_over`` stores its music-to-speech ratio here under ``"voice_over_db"``.
 
     Returns:
         The distorted 1D ``float32`` waveform, scaled down if needed so it does not clip.
 
     Raises:
-        ValueError: If ``name`` is not a known augmentation.
+        ValueError: If ``name`` is not a known augmentation, or ``voice_over`` is requested without ``speech``.
     """
     x = torch.from_numpy(np.ascontiguousarray(waveform, dtype=np.float32))
     if name == "time_stretch":
@@ -157,13 +223,30 @@ def augment(waveform: np.ndarray, name: str, rng: np.random.Generator, sample_ra
         x = F.lowpass_biquad(x, sample_rate, rng.uniform(*PARAMETER_RANGES["low_pass"]))
     elif name == "echo":
         x = _echo(x, rng, sample_rate)
+    elif name == "speed_up":
+        x = _speed_up(x, rng.uniform(*PARAMETER_RANGES["speed_up"]))
+    elif name == "voice_over":
+        if speech is None:
+            raise ValueError("voice_over needs speech chunks")
+        x, ratio_db = _voice_over(x, rng, speech)
+        if record is not None:
+            record["voice_over_db"] = ratio_db
+    elif name == "compression":
+        x = _compress(x, rng, sample_rate)
     else:
-        raise ValueError(f"unknown augmentation {name!r}, expected one of {AUGMENTATIONS}")
+        raise ValueError(f"unknown augmentation {name!r}, expected one of {AUGMENTATIONS + TEST_AUGMENTATIONS}")
     return (x / x.abs().max().clamp_min(1.0)).numpy()
 
 
-def random_augment(waveform: np.ndarray, rng: np.random.Generator, sample_rate: int) -> tuple[np.ndarray, float, str]:
-    """Distort a waveform with a randomly chosen category from ``CATEGORIES``.
+def random_augment(
+    waveform: np.ndarray,
+    rng: np.random.Generator,
+    sample_rate: int,
+    categories: tuple[tuple[str, ...], ...] = CATEGORIES,
+    speech: np.ndarray | None = None,
+    record: dict[str, float] | None = None,
+) -> tuple[np.ndarray, float, str]:
+    """Distort a waveform with a randomly chosen category.
 
     A category is one distortion or a combination applied in order, mirroring the paper's evaluation groups.
 
@@ -171,13 +254,17 @@ def random_augment(waveform: np.ndarray, rng: np.random.Generator, sample_rate: 
         waveform: 1D ``float32`` waveform.
         rng: Random generator.
         sample_rate: Sample rate of ``waveform`` in Hz.
+        categories: Categories to choose from: ``CATEGORIES`` (optionally plus ``VOICE_CATEGORIES``) for training and
+            the standard queries, ``TEST_CATEGORIES`` for the held-out TikTok-like queries.
+        speech: Speech chunks for ``voice_over`` (see :func:`augment`).
+        record: Filled with distortion parameters worth keeping (see :func:`augment`).
 
     Returns:
         A tuple ``(audio, rate, label)``. ``rate`` is ``len(waveform) / len(audio)``, so a time position ``t`` in the
         original is at ``t / rate`` in the distorted audio. ``label`` is the category joined with ``+``.
     """
-    names = CATEGORIES[rng.integers(len(CATEGORIES))]
+    names = categories[rng.integers(len(categories))]
     audio = waveform
     for name in names:
-        audio = augment(audio, name, rng, sample_rate)
+        audio = augment(audio, name, rng, sample_rate, speech, record)
     return audio, len(waveform) / len(audio), "+".join(names)

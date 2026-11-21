@@ -11,10 +11,11 @@
 * The project uses `ruff` for linting and formatting:
     * To format code, use `uv run ruff format .`.
     * To lint code, use `uv run ruff check . --fix`.
-* To download and process the dataset, use `uv run python -m afp.data --subset medium [--limit N]`
-    (or `uv run invoke data`). It is resumable; do not run it unless asked, it downloads about 22 GB.
+* To download and process the dataset, use `uv run python -m afp.data --subset small [--limit N]`
+    (or `uv run invoke data`). It is resumable; do not run it unless asked, it downloads about 8 GB (`small`).
 * To make fingerprints, use `uv run python -m afp.fingerprint cache|train|encode` (see `README.md`). `cache` downloads
-    MuQ weights (about 1.2 GB) on first use and runs the model over about 110,000 windows; do not run it unless asked.
+    MuQ weights (about 1.2 GB) on first use and runs the model over about 62,000 windows for `small`; do not run it
+    unless asked.
 * The project uses `invoke` for task management (`test`, `data`, `fmt`). To see available tasks, use
     `uv run invoke --list` or refer to the `tasks.py` file.
 * The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
