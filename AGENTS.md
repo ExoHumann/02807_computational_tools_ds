@@ -8,7 +8,6 @@
   * To run Python scripts, use `uv run <script-name>.py`.
   * To run other commands related to Python, prefix them with `uv run `, e.g., `uv run <command>`.
 * The project uses `pytest` for testing. To run tests, use `uv run pytest tests/`.
-* The digital temporal controls, playback-pack generation and optional physical capture commands are documented in `reports/temporal-study.md`.
 * The project uses `ruff` for linting and formatting:
     * To format code, use `uv run ruff format .`.
     * To lint code, use `uv run ruff check . --fix`.
@@ -37,6 +36,8 @@
 * Do not add inline comments unless absolutely necessary.
 
 # Documentation
+
+* The digital temporal controls, playback-pack generation and optional physical capture commands are documented in `reports/temporal-study.md`.
 
 * Ensure all functions and classes have docstrings.
 * Use Google style for docstrings.
