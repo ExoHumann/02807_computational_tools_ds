@@ -99,6 +99,8 @@ references, and wrongly accepts 0.050 and 0.034 of queries whose song is not. Re
 
 ## Layout
 
+The [unknown-song experiment](reports/unknown-songs.md) evaluates what happens when the source song is missing from the medium catalogue, with a calibrated threshold and track-level confidence intervals.
+
 ```txt
 src/afp/
 ├── data.py        # download FMA, decode to 24 kHz mono, manifest, cut into 10 s segments
