@@ -6,6 +6,8 @@ This project builds a song identification system, similar to Shazam or Google vo
 
 ## Data
 
+The [spherical k-means experiment](reports/ivf.md) compares a GPU inverted-file index with exhaustive cosine search and accuracy-first LSH on FMA medium fingerprints.
+
 We use the [Free Music Archive](https://github.com/mdeff/fma) (FMA) `small` subset: 8,000 clips of 30 s (mp3) plus
 metadata (Defferrard et al., ISMIR 2017). 7,994 decode cleanly; 6 corrupt mp3s are skipped. Audio is under each
 artist's own licence and meant for research, so it is downloaded rather than redistributed. It needs about 7.7 GB for

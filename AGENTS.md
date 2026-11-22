@@ -23,6 +23,8 @@
 
 # Layout
 
+* To reproduce the GPU k-means index benchmark, see `reports/ivf.md` and `notebooks/ivf_medium.ipynb`.
+
 * Source lives in `src/afp/` (`afp` is a placeholder package name). See `README.md` for the module map.
 * Tests must not need audio data or a downloaded model.
 * Audio, cached embeddings and fingerprints live under `data/` and are git-ignored.
