@@ -1,0 +1,35 @@
+{
+  "small_catalogue_tracks": 7989,
+  "small_catalogue_windows": 35292,
+  "medium_catalogue_tracks": 24970,
+  "medium_catalogue_windows": 110320,
+  "observed_training_tracks": 4996,
+  "queries": {
+    "queries": {
+      "total": 10000,
+      "absent_track_queries": 2,
+      "medium_full_correct": 9800,
+      "paired_queries": 3198,
+      "small_catalogue_correct": 3157,
+      "medium_catalogue_correct": 3131,
+      "lost_to_larger_catalogue": 26,
+      "gained_in_larger_catalogue": 0
+    },
+    "queries_tiktok": {
+      "total": 10000,
+      "absent_track_queries": 8,
+      "medium_full_correct": 9355,
+      "paired_queries": 3222,
+      "small_catalogue_correct": 3082,
+      "medium_catalogue_correct": 3022,
+      "lost_to_larger_catalogue": 60,
+      "gained_in_larger_catalogue": 0
+    }
+  },
+  "sha256": {
+    "references.npz": "174234b82db42e42839b26b7d52372b908075d5724451037b26e4a865d33a9b9",
+    "queries.npz": "6f28cceb02e25bf10aecf7d33e2965d151cdc258d8b36275d16b6a8a751c3a85",
+    "queries_tiktok.npz": "67e96f77130d2c8ab9e40d3f5a989e94e200b7244e8550394a6cd0f29108074d",
+    "manifest.csv": "8fe1d544d30f2a161aa4109451750621f4d6558629f4c9293f129644101ca643"
+  }
+}

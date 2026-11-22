@@ -130,9 +130,21 @@ The notebook verifies the three v0.2 fingerprint archives in `data/processed/fin
 
 ### Running the GPU retrieval comparison
 
-[GPU benchmark notebook](notebooks/gpu_retrieval.ipynb) · [Small results](reports/gpu-retrieval-small.json) · [Small report figure](reports/figures/gpu-retrieval-small.pdf)
+[Executed GPU notebook](notebooks/gpu_retrieval.ipynb) · [Medium report figure](reports/figures/gpu-operating-points-medium.pdf) · [Medium results](reports/gpu-retrieval-medium.json) · [Small results](reports/gpu-retrieval-small.json) · [Small report figure](reports/figures/gpu-retrieval-small.pdf)
 
 The GPU notebook compares angular LSH with exhaustive cosine search on the same FP32 vectors and CUDA device. It selects a configuration using standard development tracks, then measures track identification on disjoint held-out tracks, false acceptance after removing songs, and speed for both single and batched queries. The timing starts with embeddings already in VRAM. Model inference, disk reads, host-to-device transfer and index construction are outside the retrieval timings.
+
+On FMA medium, 110,320 windows from 24,970 searchable tracks were queried on an RTX 4090. The final evaluation used 7,458 standard and 8,992 TikTok-like queries. The two LSH settings below give different costs for reproducing exact search.
+
+| Retrieval method | Standard top-1 | TikTok-like top-1 | Median lookup |
+|---|---:|---:|---:|
+| Exhaustive cosine | 98.08% | 93.54% | 0.196 ms |
+| Fastest qualifying development setting (14 bits, 32 tables, 3 extra probes) | 97.25% | 89.52% | 0.052 ms |
+| Highest development accuracy (10 bits, 64 tables, 3 extra probes) | 98.08% | 93.54% | 0.097 ms |
+
+The accuracy-first comparison was added after observing the primary result. It matched exact search's correct counts on each query set and returned the same track for 16,446 of 16,450 queries. Its own interleaved exact timing was 0.207 ms. The primary index processed 1.10 million queries/s in 128-query batches versus 366,000 for exact search. At cosine threshold 0.70 it correctly accepted 83.58% of known queries and falsely accepted 5.99% of unknowns, versus 84.61% and 6.35% for exact search. These are synthetic distortions. The test includes tracks rendered unsearchable by the silence filter.
+
+The saved settings come from the first development sweep. To select new settings using latency on a different GPU, set `AFP_RETUNE=1`. The full [GPU figure](reports/figures/gpu-retrieval-medium.pdf) also shows the development sweep, open-set outcomes and throughput. The [pipeline record](reports/medium-pipeline.json) documents hardware, source hashes, preprocessing and worker measurements. The [paired catalogue audit](reports/medium-catalogue-audit.json) checks the training/evaluation split and measures the effect of adding reference tracks with the head and query vectors held fixed.
 
 To run it on Nikos's published fingerprints, put the three release archives in `data/processed/fingerprints`. On a fresh checkout the first command below fetches them. For the medium experiment, use the build instructions below and set `AFP_DATASET_TAG` to `medium`. The notebook saves a JSON results file and PDF/PNG figures under dataset-specific names.
 
@@ -161,7 +173,7 @@ uv run python -m afp.data --data-dir $data --speech train
 uv run python -m afp.data --data-dir $data --speech test
 uv run hf download OpenMuQ/MuQ-large-msd-iter --revision 0562a57814f6f8bbd9fdea0a25921a2fce1a841a --local-dir $backbone
 uv run python -m afp.fingerprint --data-dir $data --seed 0 cache --backbone $backbone --train-frac 0.2 --pairs 50000 --queries 10000 --voice-over --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 8
-uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 8
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 64 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 12
 uv run python -m afp.fingerprint --data-dir $data --model $model --seed 0 train --epochs 30 --batch-size 512 --device cuda
 uv run python -m afp.fingerprint --data-dir $data --model $model encode --device cuda --skip-evaluation
 ```
