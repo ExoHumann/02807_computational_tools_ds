@@ -30,6 +30,7 @@ from tqdm import tqdm
 from afp.augment import CATEGORIES, TEST_CATEGORIES, VOICE_CATEGORIES, random_augment
 from afp.data import SAMPLE_RATE, SEGMENT_S, SPEECH_FILES, load_processed, load_speech_bank, segment
 from afp.embed import EMBED_DIM, HIDDEN_DIM, MuQBackbone, ProjectionHead, train_head
+from afp.retrieval import search
 
 EMBEDDINGS_DIR = "embeddings"
 FINGERPRINTS_DIR = "fingerprints"
@@ -255,35 +256,6 @@ def _apply_head(head: ProjectionHead, embeddings: np.ndarray, device: str, batch
             for i in range(0, len(embeddings), batch_size)
         ]
     return np.concatenate(batches)
-
-
-def search(
-    references: np.ndarray,
-    reference_track: np.ndarray,
-    queries: np.ndarray,
-    threshold: float | None = None,
-    chunk: int = 256,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Exact nearest-neighbour search: the track of the most similar reference window for each query.
-
-    Args:
-        references: Unit-norm reference fingerprints, shape ``[n, dim]``.
-        reference_track: Track id of each reference fingerprint.
-        queries: Unit-norm query fingerprints, shape ``[m, dim]``.
-        threshold: Minimum cosine similarity to accept a match. Queries below it get track ``-1`` ("not found").
-        chunk: Queries searched at a time, to bound memory.
-
-    Returns:
-        A tuple ``(track, score)``: the predicted track id (``-1`` if rejected) and the best cosine similarity.
-    """
-    best = np.concatenate(
-        [(queries[i : i + chunk] @ references.T).argmax(axis=1) for i in range(0, len(queries), chunk)]
-    )
-    score = np.einsum("ij,ij->i", queries, references[best])
-    track = reference_track[best].copy()
-    if threshold is not None:
-        track[score < threshold] = -1
-    return track, score
 
 
 def top1_hit_rate(

@@ -3,6 +3,8 @@
 
 # Relevant commands
 
+* To rerun the CPU-only LSH experiment, use the notebook command under **LSH retrieval benchmark** in `README.md`. Its dependency list is `notebooks/requirements-lsh.txt`.
+
 * The project uses `uv` for management of virtual environments. This means:
   * To install packages, use `uv add <package-name>`.
   * To run Python scripts, use `uv run <script-name>.py`.

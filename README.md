@@ -110,6 +110,24 @@ data/{raw,processed}/   # git-ignored contents
 notebooks/
 ```
 
+## LSH retrieval benchmark
+
+[Open the executed notebook](notebooks/lsh_retrieval.ipynb) for the track-disjoint parameter sweep, exact and LSH results by distortion, and CPU timing comparison. The [report figure (PDF)](reports/figures/lsh-retrieval.pdf) also has a [PNG version](reports/figures/lsh-retrieval.png).
+
+From the repository root, open the notebook with the lightweight CPU environment and select **Run All Cells**:
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-lsh.txt jupyter lab notebooks/lsh_retrieval.ipynb
+```
+
+To regenerate the executed notebook and both figures from a terminal:
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-lsh.txt jupyter nbconvert --execute --inplace --to notebook --ExecutePreprocessor.timeout=600 notebooks/lsh_retrieval.ipynb
+```
+
+The notebook verifies the three v0.2 fingerprint archives in `data/processed/fingerprints/` against the published digests and downloads any missing archive. These vectors are the full input to this experiment. The index lives in `src/afp/lsh.py`, and the original exact baseline in `src/afp/retrieval.py` remains available as `afp.fingerprint.search`.
+
 ## Development
 
 Uses [uv](https://docs.astral.sh/uv/). Python 3.12.
