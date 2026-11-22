@@ -112,6 +112,8 @@ notebooks/
 
 ## Development
 
+The [time-offset voting study](reports/temporal-study.md) compares two ways to identify longer clips and includes a reproducible phone playback protocol.
+
 Uses [uv](https://docs.astral.sh/uv/). Python 3.12.
 
 ```bash
