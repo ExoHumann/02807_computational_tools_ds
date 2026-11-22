@@ -128,9 +128,37 @@ uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requi
 
 The notebook verifies the three v0.2 fingerprint archives in `data/processed/fingerprints/` against the published digests and downloads any missing archive. These vectors are the full input to this experiment. The index lives in `src/afp/lsh.py`, and the original exact baseline in `src/afp/retrieval.py` remains available as `afp.fingerprint.search`.
 
+### Rebuilding the medium fingerprints on a GPU
+
+The medium experiment starts from the original FMA audio. It fits a new head on 50,000 augmented pairs, then writes separate archives for the clean reference catalogue, 10,000 standard queries and 10,000 TikTok-like queries. All music tracks can be references. A seeded 20% of tracks supplies training pairs and the remaining 80% supplies queries. Training and test voice-overs use separate LibriSpeech speaker sets. The medium data and model live under `data/medium/`.
+
+From the repository root, set up the locked project environment with `uv sync --locked`. The commands below use PowerShell. The FMA medium archive is 22.19 GiB; decoded waveforms, speech, model weights and intermediate features require additional storage.
+
+```powershell
+$root = 'data/medium'
+$data = "$root/data"
+$model = "$root/models/projection_head.pt"
+$backbone = "$root/muq"
+$env:OMP_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+uv run python -m afp.data --data-dir $data --subset medium
+uv run python -m afp.data --data-dir $data --speech train
+uv run python -m afp.data --data-dir $data --speech test
+uv run hf download OpenMuQ/MuQ-large-msd-iter --revision 0562a57814f6f8bbd9fdea0a25921a2fce1a841a --local-dir $backbone
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache --backbone $backbone --train-frac 0.2 --pairs 50000 --queries 10000 --voice-over --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 4
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 4
+uv run python -m afp.fingerprint --data-dir $data --model $model --seed 0 train --epochs 30 --batch-size 512 --device cuda
+uv run python -m afp.fingerprint --data-dir $data --model $model encode --device cuda --skip-evaluation
+```
+
+The encoder keeps MuQ in GPU memory for each cache stage and checks every batch for finite values. On a GPU with BF16 support, the option above uses BF16 for the backbone and retries non-finite batches in FP32. Audio preparation overlaps inference for augmented clips. The 8 GiB host cache holds reusable int16 source waveforms. With less available RAM, lower `--audio-cache-gb`. Each finished feature shard can be reused if a run is interrupted. Use separate data directories for experiments with different seeds, model revisions, audio, or augmentation settings.
+
 ### Checking the effect of catalogue size
 
 After encoding FMA medium, run the following from the repository root. It checks the fingerprint shapes and norms, verifies that evaluation tracks are absent from the cached training pairs, and prints checksums and paired counts for each query set.
+
+The comparison also needs the published small manifest. If it is missing, download it with `gh release download v0.2-fingerprints --repo nickiliak/02807_computational_tools_ds --pattern manifest.csv --dir data/processed`. Its SHA-256 is `8fe1d544d30f2a161aa4109451750621f4d6558629f4c9293f129644101ca643`.
 
 ```bash
 uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-gpu.txt python scripts/compare_catalogues.py data/medium/data/processed
