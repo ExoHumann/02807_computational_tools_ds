@@ -146,8 +146,8 @@ uv run python -m afp.data --data-dir $data --subset medium
 uv run python -m afp.data --data-dir $data --speech train
 uv run python -m afp.data --data-dir $data --speech test
 uv run hf download OpenMuQ/MuQ-large-msd-iter --revision 0562a57814f6f8bbd9fdea0a25921a2fce1a841a --local-dir $backbone
-uv run python -m afp.fingerprint --data-dir $data --seed 0 cache --backbone $backbone --train-frac 0.2 --pairs 50000 --queries 10000 --voice-over --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 4
-uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 4
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache --backbone $backbone --train-frac 0.2 --pairs 50000 --queries 10000 --voice-over --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 8
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 8
 uv run python -m afp.fingerprint --data-dir $data --model $model --seed 0 train --epochs 30 --batch-size 512 --device cuda
 uv run python -m afp.fingerprint --data-dir $data --model $model encode --device cuda --skip-evaluation
 ```

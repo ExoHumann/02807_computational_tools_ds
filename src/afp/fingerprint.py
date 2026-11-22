@@ -551,7 +551,17 @@ def main(argv: list[str] | None = None) -> None:
             prep_workers=args.prep_workers,
         )
         cache_clips(
-            "queries", manifest, eval_ids, args.queries, processed_dir, backbone, False, args.seed + 1, args.batch_size
+            "queries",
+            manifest,
+            eval_ids,
+            args.queries,
+            processed_dir,
+            backbone,
+            False,
+            args.seed + 1,
+            args.batch_size,
+            audio_cache_gb=args.audio_cache_gb,
+            prep_workers=args.prep_workers,
         )
         print(f"FP32 fallback batches: {backbone.fp32_fallbacks}")
     elif args.command == "cache-tiktok":
