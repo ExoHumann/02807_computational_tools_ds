@@ -128,6 +128,16 @@ uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requi
 
 The notebook verifies the three v0.2 fingerprint archives in `data/processed/fingerprints/` against the published digests and downloads any missing archive. These vectors are the full input to this experiment. The index lives in `src/afp/lsh.py`, and the original exact baseline in `src/afp/retrieval.py` remains available as `afp.fingerprint.search`.
 
+### Checking the effect of catalogue size
+
+After encoding FMA medium, run the following from the repository root. It checks the fingerprint shapes and norms, verifies that evaluation tracks are absent from the cached training pairs, and prints checksums and paired counts for each query set.
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-gpu.txt python scripts/compare_catalogues.py data/medium/data/processed
+```
+
+The comparison uses the new medium head for both searches. It restricts the smaller index to tracks in the v0.2 small manifest and evaluates exactly the same queries against both catalogues. This isolates the effect of adding candidate songs. The original small release uses its own head and query draws.
+
 ## Development
 
 Uses [uv](https://docs.astral.sh/uv/). Python 3.12.
