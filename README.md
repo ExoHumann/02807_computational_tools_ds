@@ -128,6 +128,20 @@ uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requi
 
 The notebook verifies the three v0.2 fingerprint archives in `data/processed/fingerprints/` against the published digests and downloads any missing archive. These vectors are the full input to this experiment. The index lives in `src/afp/lsh.py`, and the original exact baseline in `src/afp/retrieval.py` remains available as `afp.fingerprint.search`.
 
+### Running the GPU retrieval comparison
+
+[GPU benchmark notebook](notebooks/gpu_retrieval.ipynb) · [Small results](reports/gpu-retrieval-small.json) · [Small report figure](reports/figures/gpu-retrieval-small.pdf)
+
+The GPU notebook compares angular LSH with exhaustive cosine search on the same FP32 vectors and CUDA device. It selects a configuration using standard development tracks, then measures track identification on disjoint held-out tracks, false acceptance after removing songs, and speed for both single and batched queries. The timing starts with embeddings already in VRAM. Model inference, disk reads, host-to-device transfer and index construction are outside the retrieval timings.
+
+To run it on Nikos's published fingerprints, put the three release archives in `data/processed/fingerprints`. On a fresh checkout the first command below fetches them. For the medium experiment, use the build instructions below and set `AFP_DATASET_TAG` to `medium`. The notebook saves a JSON results file and PDF/PNG figures under dataset-specific names.
+
+```powershell
+gh release download v0.2-fingerprints --repo nickiliak/02807_computational_tools_ds --pattern '*.npz' --dir data/processed/fingerprints
+$env:AFP_DATASET_TAG = 'small'
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-gpu.txt jupyter nbconvert --execute --inplace --to notebook --ExecutePreprocessor.timeout=600 notebooks/gpu_retrieval.ipynb
+```
+
 ### Rebuilding the medium fingerprints on a GPU
 
 The medium experiment starts from the original FMA audio. It fits a new head on 50,000 augmented pairs, then writes separate archives for the clean reference catalogue, 10,000 standard queries and 10,000 TikTok-like queries. All music tracks can be references. A seeded 20% of tracks supplies training pairs and the remaining 80% supplies queries. Training and test voice-overs use separate LibriSpeech speaker sets. The medium data and model live under `data/medium/`.
