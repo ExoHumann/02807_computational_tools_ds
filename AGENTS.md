@@ -3,6 +3,9 @@
 
 # Relevant commands
 
+* To rerun the CPU-only LSH experiment, use the notebook command under **LSH retrieval benchmark** in `README.md`. Its dependency list is `notebooks/requirements-lsh.txt`.
+* After encoding medium, the **Checking the effect of catalogue size** command validates its evaluation split and compares exact retrieval with a nested small catalogue.
+
 * The project uses `uv` for management of virtual environments. This means:
   * To install packages, use `uv add <package-name>`.
   * To run Python scripts, use `uv run <script-name>.py`.

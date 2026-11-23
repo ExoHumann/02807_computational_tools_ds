@@ -139,3 +139,32 @@ def test_cache_clean_adds_rms_to_old_shards_without_the_backbone(tmp_path):
     cache_clean(manifest, tmp_path, backbone=None)
     rms = np.load(shard)["rms"]
     assert len(rms) == len(old["embeddings"]) and rms[0] < 1e-3 < rms[-1]
+
+
+def test_audio_cache_and_partial_resume_preserve_augmented_pairs(tmp_path):
+    """Check that a bounded waveform cache and resuming between shards preserve seeded outputs."""
+    rng = np.random.default_rng(91)
+    rows = []
+    for track in (7, 8):
+        path = track_path(tmp_path, track)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(path, rng.integers(-5000, 5000, 12 * SAMPLE_RATE, dtype=np.int16))
+        rows.append({"track_id": track, "path": path.relative_to(tmp_path).as_posix()})
+    manifest = pd.DataFrame(rows)
+    args = {
+        "manifest": manifest, "track_ids": np.array([7, 8]), "processed_dir": tmp_path,
+        "backbone": FakeBackbone(), "with_clean": True, "seed": 12, "batch_size": 2,
+        "clips_per_shard": 2, "categories": (("noise",),),
+    }
+    cache_clips("uncached", n_clips=5, **args)
+    one_track_gib = (12 * SAMPLE_RATE * 2) / (1 << 30)
+    cache_clips("cached", n_clips=2, audio_cache_gb=one_track_gib, **args)
+    first_path = tmp_path / "embeddings/cached/shard_0000.npz"
+    first_write = first_path.stat().st_mtime_ns
+    cache_clips("cached", n_clips=5, audio_cache_gb=one_track_gib, prep_workers=3, **args)
+    assert first_path.stat().st_mtime_ns == first_write
+    for original in sorted((tmp_path / "embeddings/uncached").glob("shard_*.npz")):
+        with np.load(original) as expected, np.load(first_path.with_name(original.name)) as resumed:
+            assert expected.files == resumed.files
+            for key in expected.files:
+                np.testing.assert_array_equal(expected[key], resumed[key])

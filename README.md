@@ -110,6 +110,88 @@ data/{raw,processed}/   # git-ignored contents
 notebooks/
 ```
 
+## LSH retrieval benchmark
+
+[Open the executed notebook](notebooks/lsh_retrieval.ipynb) for the track-disjoint parameter sweep, exact and LSH results by distortion, and CPU timing comparison. The [report figure (PDF)](reports/figures/lsh-retrieval.pdf) also has a [PNG version](reports/figures/lsh-retrieval.png).
+
+From the repository root, open the notebook with the lightweight CPU environment and select **Run All Cells**:
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-lsh.txt jupyter lab notebooks/lsh_retrieval.ipynb
+```
+
+To regenerate the executed notebook and both figures from a terminal:
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-lsh.txt jupyter nbconvert --execute --inplace --to notebook --ExecutePreprocessor.timeout=600 notebooks/lsh_retrieval.ipynb
+```
+
+The notebook verifies the three v0.2 fingerprint archives in `data/processed/fingerprints/` against the published digests and downloads any missing archive. These vectors are the full input to this experiment. The index lives in `src/afp/lsh.py`, and the original exact baseline in `src/afp/retrieval.py` remains available as `afp.fingerprint.search`.
+
+### Running the GPU retrieval comparison
+
+[Executed GPU notebook](notebooks/gpu_retrieval.ipynb) · [Medium report figure](reports/figures/gpu-operating-points-medium.pdf) · [Medium results](reports/gpu-retrieval-medium.json) · [Small results](reports/gpu-retrieval-small.json) · [Small report figure](reports/figures/gpu-retrieval-small.pdf)
+
+The GPU notebook compares angular LSH with exhaustive cosine search on the same FP32 vectors and CUDA device. It selects a configuration using standard development tracks, then measures track identification on disjoint held-out tracks, false acceptance after removing songs, and speed for both single and batched queries. The timing starts with embeddings already in VRAM. Model inference, disk reads, host-to-device transfer and index construction are outside the retrieval timings.
+
+On FMA medium, 110,320 windows from 24,970 searchable tracks were queried on an RTX 4090. The final evaluation used 7,458 standard and 8,992 TikTok-like queries. The two LSH settings below give different costs for reproducing exact search.
+
+| Retrieval method | Standard top-1 | TikTok-like top-1 | Median lookup |
+|---|---:|---:|---:|
+| Exhaustive cosine | 98.08% | 93.54% | 0.196 ms |
+| Fastest qualifying development setting (14 bits, 32 tables, 3 extra probes) | 97.25% | 89.52% | 0.052 ms |
+| Highest development accuracy (10 bits, 64 tables, 3 extra probes) | 98.08% | 93.54% | 0.097 ms |
+
+The accuracy-first comparison was added after observing the primary result. It matched exact search's correct counts on each query set and returned the same track for 16,446 of 16,450 queries. Its own interleaved exact timing was 0.207 ms. The primary index processed 1.10 million queries/s in 128-query batches versus 366,000 for exact search. At cosine threshold 0.70 it correctly accepted 83.58% of known queries and falsely accepted 5.99% of unknowns, versus 84.61% and 6.35% for exact search. These are synthetic distortions. The test includes tracks rendered unsearchable by the silence filter.
+
+The saved settings come from the first development sweep. To select new settings using latency on a different GPU, set `AFP_RETUNE=1`. The full [GPU figure](reports/figures/gpu-retrieval-medium.pdf) also shows the development sweep, open-set outcomes and throughput. The [pipeline record](reports/medium-pipeline.json) documents hardware, source hashes, preprocessing and worker measurements. The [paired catalogue audit](reports/medium-catalogue-audit.json) checks the training/evaluation split and measures the effect of adding reference tracks with the head and query vectors held fixed.
+
+To run it on Nikos's published fingerprints, put the three release archives in `data/processed/fingerprints`. On a fresh checkout the first command below fetches them. For the medium experiment, use the build instructions below and set `AFP_DATASET_TAG` to `medium`. The notebook saves a JSON results file and PDF/PNG figures under dataset-specific names.
+
+```powershell
+gh release download v0.2-fingerprints --repo nickiliak/02807_computational_tools_ds --pattern '*.npz' --dir data/processed/fingerprints
+$env:AFP_DATASET_TAG = 'small'
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-gpu.txt jupyter nbconvert --execute --inplace --to notebook --ExecutePreprocessor.timeout=600 notebooks/gpu_retrieval.ipynb
+```
+
+### Rebuilding the medium fingerprints on a GPU
+
+The medium experiment starts from the original FMA audio. It fits a new head on 50,000 augmented pairs, then writes separate archives for the clean reference catalogue, 10,000 standard queries and 10,000 TikTok-like queries. All music tracks can be references. A seeded 20% of tracks supplies training pairs and the remaining 80% supplies queries. Training and test voice-overs use separate LibriSpeech speaker sets. The medium data and model live under `data/medium/`.
+
+From the repository root, set up the locked project environment with `uv sync --locked`. The commands below use PowerShell. The FMA medium archive is 22.19 GiB; decoded waveforms, speech, model weights and intermediate features require additional storage.
+
+```powershell
+$root = 'data/medium'
+$data = "$root/data"
+$model = "$root/models/projection_head.pt"
+$backbone = "$root/muq"
+$env:OMP_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+uv run python -m afp.data --data-dir $data --subset medium
+uv run python -m afp.data --data-dir $data --speech train
+uv run python -m afp.data --data-dir $data --speech test
+uv run hf download OpenMuQ/MuQ-large-msd-iter --revision 0562a57814f6f8bbd9fdea0a25921a2fce1a841a --local-dir $backbone
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache --backbone $backbone --train-frac 0.2 --pairs 50000 --queries 10000 --voice-over --batch-size 16 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 8
+uv run python -m afp.fingerprint --data-dir $data --seed 0 cache-tiktok --backbone $backbone --train-frac 0.2 --queries 10000 --batch-size 64 --device cuda --precision bf16 --audio-cache-gb 8 --prep-workers 12
+uv run python -m afp.fingerprint --data-dir $data --model $model --seed 0 train --epochs 30 --batch-size 512 --device cuda
+uv run python -m afp.fingerprint --data-dir $data --model $model encode --device cuda --skip-evaluation
+```
+
+The encoder keeps MuQ in GPU memory for each cache stage and checks every batch for finite values. On a GPU with BF16 support, the option above uses BF16 for the backbone and retries non-finite batches in FP32. Audio preparation overlaps inference for augmented clips. The 8 GiB host cache holds reusable int16 source waveforms. With less available RAM, lower `--audio-cache-gb`. Each finished feature shard can be reused if a run is interrupted. Use separate data directories for experiments with different seeds, model revisions, audio, or augmentation settings.
+
+### Checking the effect of catalogue size
+
+After encoding FMA medium, run the following from the repository root. It checks the fingerprint shapes and norms, verifies that evaluation tracks are absent from the cached training pairs, and prints checksums and paired counts for each query set.
+
+The comparison also needs the published small manifest. If it is missing, download it with `gh release download v0.2-fingerprints --repo nickiliak/02807_computational_tools_ds --pattern manifest.csv --dir data/processed`. Its SHA-256 is `8fe1d544d30f2a161aa4109451750621f4d6558629f4c9293f129644101ca643`.
+
+```bash
+uv run --isolated --no-project --python 3.12 --with-requirements notebooks/requirements-gpu.txt python scripts/compare_catalogues.py data/medium/data/processed
+```
+
+The comparison uses the new medium head for both searches. It restricts the smaller index to tracks in the v0.2 small manifest and evaluates exactly the same queries against both catalogues. This isolates the effect of adding candidate songs. The original small release uses its own head and query draws.
+
 ## Development
 
 Uses [uv](https://docs.astral.sh/uv/). Python 3.12.

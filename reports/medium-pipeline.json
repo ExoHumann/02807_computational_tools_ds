@@ -1,0 +1,248 @@
+{
+  "status": "completed",
+  "date": "2026-11-22",
+  "data_root": "data/medium/data",
+  "sources": {
+    "fma_medium": {
+      "url": "https://os.unil.cloud.switch.ch/fma/fma_medium.zip",
+      "bytes": 23825005356,
+      "sha1_expected_and_verified": "c67b69ea232021025fca9231fc1c7c1a063ab50b"
+    },
+    "fma_metadata": {
+      "url": "https://os.unil.cloud.switch.ch/fma/fma_metadata.zip",
+      "bytes": 358412441,
+      "sha1_expected_and_verified": "f0df49ffe5f2a6008d7dc83c6915b31835dfe733"
+    },
+    "librispeech_train_clean_100": {
+      "url": "https://www.openslr.org/resources/12/train-clean-100.tar.gz",
+      "bytes": 6387309499,
+      "md5_from_openslr_and_verified": "2a93770f6d5c6c964bc36631d331a522",
+      "speech_chunks": 600,
+      "speakers": 100
+    },
+    "librispeech_dev_clean": {
+      "url": "https://www.openslr.org/resources/12/dev-clean.tar.gz",
+      "bytes": 337926286,
+      "md5_from_openslr_and_verified": "42e2234ba48799c1f50f24a7926300a1",
+      "speech_chunks": 240,
+      "speakers": 40
+    }
+  },
+  "audio_processing": {
+    "sample_rate_hz": 24000,
+    "manifest_tracks": 24980,
+    "skipped_tracks": 20,
+    "clean_windows_before_silence_filter": 110386,
+    "speech_chunk_samples": 240000,
+    "fma_preprocessing_elapsed_s": 215
+  },
+  "model": {
+    "backbone_repo": "OpenMuQ/MuQ-large-msd-iter",
+    "backbone_revision": "0562a57814f6f8bbd9fdea0a25921a2fce1a841a",
+    "backbone_path_used": "data/medium/hf-cache/hub/models--OpenMuQ--MuQ-large-msd-iter/snapshots/0562a57814f6f8bbd9fdea0a25921a2fce1a841a",
+    "head_path": "data/medium/models/projection_head.pt",
+    "head_bytes": 20991248,
+    "head_sha256": "4a5fb50d5dea344c0fdc803e9c825b6dfbd39b5dc86bafdce96c261e63801c6f"
+  },
+  "runtime": {
+    "python": "3.12.11",
+    "torch": "2.6.0+cu118",
+    "cuda_runtime": "11.8",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "hf_hub_offline": true,
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "mkl_threads": 1
+  },
+  "experiment": {
+    "seed": 0,
+    "train_fraction_by_track": 0.2,
+    "training_tracks": 4996,
+    "evaluation_tracks": 19984,
+    "pair_count": 50000,
+    "standard_query_count": 10000,
+    "tiktok_query_count": 10000,
+    "training_voice_over": true,
+    "tiktok_voice_over_uses_held_out_devspeakers": true,
+    "feature_device": "cuda",
+    "feature_precision": "bfloat16 autocast with float32 pooling and finite-output fallback",
+    "feature_batch_size_standard": 16,
+    "feature_batch_size_tiktok": 64,
+    "head_training_device": "cuda",
+    "head_epochs": 30,
+    "head_batch_size": 512,
+    "head_learning_rate": 0.001,
+    "head_temperature": 0.1,
+    "pair_cache_workers": 8,
+    "query_cache_workers": 8,
+    "tiktok_cache_workers": 12,
+    "raw_int16_audio_lru_limit_gib": 8,
+    "split_and_shard_seed_offsets": {
+      "training_pairs": 0,
+      "standard_queries": 1,
+      "tiktok_queries": 2
+    },
+    "pair_shards_by_preparation_workers": {
+      "1": 1,
+      "4": 57,
+      "8": 442
+    }
+  },
+  "cache_observations": {
+    "pair_lru": {
+      "hits": 38060,
+      "misses": 4996,
+      "peak_gib": 6.7,
+      "scope": "final 425 resumed shards"
+    },
+    "standard_query_lru": {
+      "hits": 2039,
+      "misses": 8113,
+      "peak_gib": 8.0
+    },
+    "tiktok_query_lru": {
+      "hits": 2234,
+      "misses": 8598,
+      "peak_gib": 8.0
+    },
+    "reported_fp32_fallback_batches_after_resume": 0,
+    "reported_fp32_fallback_batches_tiktok": 0,
+    "note": "Earlier clean and pair-cache processes were stopped at resumable boundaries before their final fallback summary; every saved shard passed the finite-feature guard."
+  },
+  "fingerprints": {
+    "directory": "data/medium/data/processed/fingerprints",
+    "reference_vectors": 110320,
+    "near_silent_references_dropped": 66,
+    "standard_query_vectors": 10000,
+    "tiktok_query_vectors": 10000,
+    "dimension": 256,
+    "dtype": "float32",
+    "all_finite": true,
+    "maximum_unit_norm_error": 1.7881393432617188e-07,
+    "directory_bytes": 137435966,
+    "exact_search_metrics": "omitted during encode; produced by the separate CUDA audit"
+  },
+  "artifact_bytes": {
+    "clean_feature_shards": 228245932,
+    "pair_feature_shards": 210961000,
+    "standard_query_feature_shards": 21688000,
+    "tiktok_query_feature_shards": 21968000,
+    "speech_train_npy": 288000128,
+    "speech_test_npy": 115200128
+  },
+  "hardware_trials": {
+    "cpu": {
+      "description": "Two passes per worker count on the same 384 held-out TikTok-like clips in 48 eight-clip shards, CPU audio preparation only. SHA-256 of sampled audio and metadata agreed in all six trials.",
+      "samples": [
+        {
+          "workers": 12,
+          "wall_seconds": 3.5177045999953407,
+          "clips_per_s": 109.16209394060792,
+          "avg_cpu_cores": 6.147474691316788,
+          "minimum_system_free_gib": 43.89242172241211
+        },
+        {
+          "workers": 8,
+          "wall_seconds": 3.834680300002219,
+          "clips_per_s": 100.13872603663408,
+          "avg_cpu_cores": 4.987377956902674,
+          "minimum_system_free_gib": 43.69248580932617
+        },
+        {
+          "workers": 16,
+          "wall_seconds": 3.6993115000004764,
+          "clips_per_s": 103.80309957675922,
+          "avg_cpu_cores": 6.407442303790029,
+          "minimum_system_free_gib": 43.23330307006836
+        },
+        {
+          "workers": 16,
+          "wall_seconds": 3.8791979000016,
+          "clips_per_s": 98.98953595531736,
+          "avg_cpu_cores": 6.1747623136190395,
+          "minimum_system_free_gib": 42.81214141845703
+        },
+        {
+          "workers": 8,
+          "wall_seconds": 4.141601400006039,
+          "clips_per_s": 92.71775888414567,
+          "avg_cpu_cores": 4.783777598677437,
+          "minimum_system_free_gib": 42.95830535888672
+        },
+        {
+          "workers": 12,
+          "wall_seconds": 3.4452318999974523,
+          "clips_per_s": 111.45838978220421,
+          "avg_cpu_cores": 6.326678619229121,
+          "minimum_system_free_gib": 43.740360260009766
+        }
+      ]
+    },
+    "gpu": {
+      "description": "Five timed passes per BF16 batch size, with warmed shapes in shuffled order on one set of 100 real ten-second FMA medium windows. Timings include host-to-device transfer and return of cached features. Peak memory is PyTorch allocation. Cosine uses the released projection head.",
+      "results": {
+        "device": "NVIDIA GeForce RTX 4090",
+        "windows": 100,
+        "fp32_fallbacks": 0,
+        "rows": [
+          {
+            "batch_size": 16,
+            "seconds_per_1000_windows": 9.909869999974035,
+            "seconds_per_shard": 0.9909869999974035,
+            "peak_allocated_gib": 3.254075527191162,
+            "min_projected_cosine": 0.9999998807907104,
+            "seconds_per_shard_samples": [
+              0.7300531000000774,
+              2.059393799994723,
+              1.4581611000030534,
+              0.9483872999990126,
+              0.9909869999974035
+            ]
+          },
+          {
+            "batch_size": 32,
+            "seconds_per_1000_windows": 12.715299999981653,
+            "seconds_per_shard": 1.2715299999981653,
+            "peak_allocated_gib": 5.2292304039001465,
+            "min_projected_cosine": 0.9999998807907104,
+            "seconds_per_shard_samples": [
+              1.1186164999962784,
+              1.2715299999981653,
+              0.7870343000031426,
+              1.8158830999964266,
+              1.2909309000024223
+            ]
+          },
+          {
+            "batch_size": 64,
+            "seconds_per_1000_windows": 9.073475999975926,
+            "seconds_per_shard": 0.9073475999975926,
+            "peak_allocated_gib": 9.179349422454834,
+            "min_projected_cosine": 0.9999955296516418,
+            "seconds_per_shard_samples": [
+              0.779464300001564,
+              0.9073475999975926,
+              0.8653443000002881,
+              1.5207261000032304,
+              1.4312109999955283
+            ]
+          },
+          {
+            "batch_size": 100,
+            "seconds_per_1000_windows": 12.861092000021017,
+            "seconds_per_shard": 1.2861092000021017,
+            "peak_allocated_gib": 13.624209880828857,
+            "min_projected_cosine": 0.999996542930603,
+            "seconds_per_shard_samples": [
+              1.3362846999953035,
+              1.2156172999966657,
+              1.7753381000002264,
+              0.9674904999992577,
+              1.2861092000021017
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

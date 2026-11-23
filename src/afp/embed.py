@@ -50,10 +50,21 @@ class MuQBackbone:
         repo: Hugging Face id of the MuQ checkpoint.
     """
 
-    def __init__(self, device: str | None = None, repo: str = MUQ_REPO) -> None:
+    def __init__(
+        self,
+        device: str | None = None,
+        repo: str = MUQ_REPO,
+        autocast_dtype: torch.dtype | None = None,
+    ) -> None:
         from muq import MuQ
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if autocast_dtype is not None and not self.device.startswith("cuda"):
+            raise ValueError("autocast_dtype requires a CUDA device")
+        if autocast_dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+            raise ValueError("The selected CUDA device does not support bfloat16 autocasting")
+        self.autocast_dtype = autocast_dtype
+        self.fp32_fallbacks = 0
         self.model = MuQ.from_pretrained(repo).to(self.device).eval()
 
     @torch.no_grad()
@@ -66,8 +77,22 @@ class MuQBackbone:
         Returns:
             ``float32`` array of shape ``[n, BACKBONE_DIM]``.
         """
-        output = self.model(torch.from_numpy(waveforms).to(self.device), output_hidden_states=True)
-        return output.last_hidden_state.mean(dim=1).float().cpu().numpy()
+        inputs = torch.from_numpy(waveforms).to(self.device)
+        if self.autocast_dtype is None:
+            output = self.model(inputs, output_hidden_states=True)
+        else:
+            with torch.autocast(device_type="cuda", dtype=self.autocast_dtype):
+                output = self.model(inputs, output_hidden_states=True)
+        embeddings = output.last_hidden_state.float().mean(dim=1)
+        if not torch.isfinite(embeddings).all():
+            if self.autocast_dtype is None:
+                raise FloatingPointError("MuQ returned non-finite float32 embeddings")
+            output = self.model(inputs, output_hidden_states=True)
+            embeddings = output.last_hidden_state.float().mean(dim=1)
+            self.fp32_fallbacks += 1
+            if not torch.isfinite(embeddings).all():
+                raise FloatingPointError("MuQ returned non-finite embeddings with BF16 and FP32")
+        return embeddings.cpu().numpy()
 
 
 def info_nce(a: torch.Tensor, b: torch.Tensor, temperature: float) -> torch.Tensor:
