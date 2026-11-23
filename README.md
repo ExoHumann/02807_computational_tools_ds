@@ -97,6 +97,50 @@ Evaluation so far (exact search, FMA `small`, queries from tracks the head never
 With a 0.7 threshold, head v2 finds 0.925 of standard and 0.668 of TikTok-like queries whose song is in the
 references, and wrongly accepts 0.050 and 0.034 of queries whose song is not. Real-world recordings are not covered.
 
+## Clustering
+
+Two uses of the general clustering algorithms from the course, both implemented by hand (k-means, DBSCAN,
+Davies-Bouldin index) and tested against scikit-learn. They run on CPU in seconds on the released `small`
+fingerprints.
+
+### k-means IVF index (`src/afp/cluster.py`)
+
+The reference windows are split into `k` clusters with spherical k-means (Lloyd's algorithm, k-means++ seeding,
+centroids rescaled to unit length). A query is compared only with the windows in the `nprobe` clusters whose
+centroids are closest to it. Vectors are stored sorted by cluster, so each probed cluster is one contiguous block.
+
+```bash
+uv run python -m afp.cluster --k 128 256 512 --nprobe 4 8 16 32   # writes ivf_{clusters,search}.csv
+```
+
+FMA `small`, 35,292 windows, one query at a time on a laptop CPU (numpy):
+
+| Index | Standard top-1 | TikTok-like top-1 | Windows compared | ms per query |
+|---|---:|---:|---:|---:|
+| exact | 0.983 | 0.899 | 100% | 0.11 |
+| k = 128, nprobe = 8 | 0.971 | 0.866 | 6.7% | 0.04 |
+| k = 128, nprobe = 32 | 0.980 | 0.896 | 25% | 0.14 |
+| k = 512, nprobe = 16 | 0.976 | 0.883 | 4.7% | 0.05 |
+
+The Davies-Bouldin index keeps falling as `k` grows (4.0 at 32, 2.8 at 1024): the fingerprints have no natural
+coarse cluster structure, so `k` is chosen by the speed/accuracy trade-off instead. Song-level k-means also barely
+follows genre (normalised mutual information about 0.27 against `genre_top`), as expected for features trained to
+tell recordings apart rather than styles.
+
+### DBSCAN: songs that share audio (`src/afp/related.py`)
+
+DBSCAN runs on the reference windows with cosine similarity as the neighbourhood (`eps = sqrt(2 - 2 s)` for unit
+vectors). Unique music ends up as noise; a cluster holding windows of two or more tracks links those tracks.
+
+```bash
+uv run python -m afp.related --min-similarity 0.9 --min-points 2   # writes dbscan_sweep.csv, related_pairs.csv
+```
+
+At similarity 0.9 and `min_points` 2, 82.6% of windows are noise and 69 track pairs are linked, 97% of them by the
+same artist: duplicate uploads, album/single versions, instrumental and vocal versions, a radio edit, a live
+version and remixes, two of them across artists. Some exact-search "misses" are such versions: 5 of 34 standard
+and 7 of 201 TikTok-like misses return a linked version of the right song.
+
 ## Layout
 
 ```txt
@@ -104,7 +148,9 @@ src/afp/
 ├── data.py        # download FMA, decode to 24 kHz mono, manifest, cut into 10 s segments
 ├── augment.py     # the paper's distortions (time stretch, pitch, noise, reverb, filters, echo)
 ├── embed.py       # MuQ backbone, 1024 -> 4096 -> 256 projection head, contrastive training
-└── fingerprint.py # cache / train / encode command line
+├── fingerprint.py # cache / train / encode command line
+├── cluster.py     # k-means, Davies-Bouldin index, IVF index and its evaluation
+└── related.py     # DBSCAN over window fingerprints to find tracks that share audio
 tests/
 data/{raw,processed}/   # git-ignored contents
 notebooks/
