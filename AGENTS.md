@@ -1,48 +1,23 @@
-> Guidance for autonomous coding agents
-> Read this before writing, editing, or executing anything in this repo.
+> Guidance for autonomous coding agents. Read this before writing, editing, or executing anything in this repo.
 
-# Relevant commands
+# Commands
 
-* To rerun the CPU-only LSH experiment, use the notebook command under **LSH retrieval benchmark** in `README.md`. Its dependency list is `notebooks/requirements-lsh.txt`.
-* After encoding medium, the **Checking the effect of catalogue size** command validates its evaluation split and compares exact retrieval with a nested small catalogue.
-
-* The project uses `uv` for management of virtual environments. This means:
-  * To install packages, use `uv add <package-name>`.
-  * To run Python scripts, use `uv run <script-name>.py`.
-  * To run other commands related to Python, prefix them with `uv run `, e.g., `uv run <command>`.
-* The project uses `pytest` for testing. To run tests, use `uv run pytest tests/`.
-* The project uses `ruff` for linting and formatting:
-    * To format code, use `uv run ruff format .`.
-    * To lint code, use `uv run ruff check . --fix`.
-* To download and process the dataset, use `uv run python -m afp.data --subset small [--limit N]`
-    (or `uv run invoke data`). It is resumable; do not run it unless asked, it downloads about 8 GB (`small`).
-* To make fingerprints, use `uv run python -m afp.fingerprint cache|train|encode` (see `README.md`). `cache` downloads
-    MuQ weights (about 1.2 GB) on first use and runs the model over about 62,000 windows for `small`; do not run it
-    unless asked.
-* To evaluate the k-means IVF index, use `uv run python -m afp.cluster [--k ...] [--nprobe ...]`. It needs the
-    fingerprints from `afp.fingerprint encode` and runs on CPU in minutes.
-* To find tracks that share audio with DBSCAN, use `uv run python -m afp.related [--min-similarity 0.9]`.
-* The project uses `invoke` for task management (`test`, `data`, `fmt`). To see available tasks, use
-    `uv run invoke --list` or refer to the `tasks.py` file.
-* The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
-    `uv run pre-commit run --all-files`. For more information, refer to the `.pre-commit-config.yaml` file.
+* `uv` manages the environment: `uv add <pkg>` to install, `uv run <cmd>` for everything Python. `uv sync` (core), `--extra notebook` (Jupyter, matplotlib), `--extra gpu` (CuPy, CUDA 12). One lockfile covers all.
+* Tests: `uv run pytest tests/` (no data or model needed; GPU tests skip without CuPy). Lint/format: `uv run ruff check . --fix`, `uv run ruff format .` (or `uv run invoke fmt`). Tasks: `uv run invoke --list` (`test`, `data`, `fmt`; see `tasks.py`). Hooks: `uv run pre-commit run --all-files` (config: `.pre-commit-config.yaml`).
+* Do not run these unless asked (large downloads or long GPU jobs, all resumable):
+  * `uv run python -m afp.data --subset small|medium [--limit N]` (or `uv run invoke data`): downloads about 8 GB (`small`) or 22 GB (`medium`).
+  * `uv run python -m afp.fingerprint cache|train|encode` (see `README.md`): `cache` downloads MuQ weights (about 1.2 GB) and runs the model over every window (about 35,000 clean windows for `small`, plus pairs and queries).
+* Cheap CPU commands on existing fingerprints: `uv run python -m afp.cluster [--k ...] [--nprobe ...]` (k-means IVF evaluation), `uv run python -m afp.related [--min-similarity 0.9]` (DBSCAN, tracks sharing audio).
+* Notebooks and the medium rebuild are in `README.md` (LSH section).
 
 # Layout
 
-* Source lives in `src/afp/` (`afp` is a placeholder package name). See `README.md` for the module map.
+* Source in `src/afp/` (`afp` is a placeholder name); module map in `README.md`.
 * Tests must not need audio data or a downloaded model.
 * Audio, cached embeddings and fingerprints live under `data/` and are git-ignored.
 
-# Code style
+# Code style and documentation
 
-* Follow existing code style.
-* Keep line length within 120 characters.
-* Use f-strings for formatting.
-* Use type hints
-* Do not add inline comments unless absolutely necessary.
-
-# Documentation
-
-* Ensure all functions and classes have docstrings.
-* Use Google style for docstrings.
-* Update this `AGENTS.md` file if any new tools or commands are added to the project.
+* Follow existing style; line length 120; f-strings; type hints; no inline comments unless absolutely necessary.
+* All functions and classes have Google-style docstrings.
+* Update this file when tools or commands are added.
