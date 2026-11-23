@@ -26,6 +26,10 @@ The builder checks the shared MP3s' uncompressed byte counts and CRCs against th
 
 Of the 81,574 additional source tracks, 80,735 supplied 354,144 searchable windows. The decoder could not read 253 tracks, 515 produced less than ten seconds of audio, and 71 had no window above the RMS cutoff. With the 24,970 searchable medium tracks, the benchmark therefore contains 105,705 tracks and 464,464 windows.
 
+The archive describes its audio as 30-second clips, but 18 searchable tracks contributed more than five windows. Track 039179 alone contributed 122, with the last window starting at 605 seconds. We kept all usable windows under the original segmentation rule. The [pipeline record](catalogue-growth-pipeline.json) contains the archive and output checksums, attrition counts and CPU measurements.
+
+We also independently re-encoded 24 shared, searchable tracks drawn without replacement with NumPy seed 2807. All 108 window indices and RMS values matched the archived medium values exactly. The lowest cosine between a regenerated fingerprint and its archived counterpart was 0.9999957, and every regenerated window retrieved its source track from Medium.
+
 ## Reproduce the comparison
 
 The checked-in notebook reads the measured JSON and regenerates its figure without the audio or GPU. Repeating the GPU measurements requires the group's frozen medium reference, projection head and query files. The public v0.2 release contains the small experiment. Its fingerprints have different checksums. The archived medium retrieval input bundle contains the reference and the two closed-set query families. The head and runner-up query pack are separate inputs.
