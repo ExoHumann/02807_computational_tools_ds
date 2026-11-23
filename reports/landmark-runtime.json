@@ -1,0 +1,10 @@
+{
+  "indexed_candidate_tracks": 8184,
+  "candidate_peak_bytes": 45775488,
+  "indexed_seconds": 156.22549650000292,
+  "initialisation_and_warmup_seconds": 156.42704179999419,
+  "warp_hypotheses": 502,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "verifier_median_ms": 3.399350000108825,
+  "verifier_p95_ms": 6.35688999791455
+}

@@ -40,3 +40,5 @@
 * Ensure all functions and classes have docstrings.
 * Use Google style for docstrings.
 * Update this `AGENTS.md` file if any new tools or commands are added to the project.
+
+The recording-group and landmark experiment runs from the repository root. The [experiment notes](reports/recording-landmarks.md) list the GPU stages, their inputs and the CPU-only replay notebook.

@@ -1,0 +1,10 @@
+{
+  "searchable": 105705,
+  "candidate_pairs": 8446,
+  "verified_edges": 3446,
+  "groups": 102748,
+  "multi_track_groups": 2628,
+  "eligible_fresh_groups": 77962,
+  "groups_per_phase_and_status": 256,
+  "seed": 28071123
+}

@@ -1,0 +1,14 @@
+{
+  "cosine": {
+    "median_ms": 13.8748,
+    "p95_ms": 15.13506
+  },
+  "fusion": {
+    "median_ms": 16.6966,
+    "p95_ms": 18.18446
+  },
+  "queries": 64,
+  "paired_median_extra_ms": 2.9356500000000008,
+  "same_saved_candidate_sets": 64,
+  "same_live_candidate_sets": 64
+}
