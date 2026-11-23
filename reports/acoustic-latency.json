@@ -1,0 +1,41 @@
+{
+  "samples": 64,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "matched_batch_comparison": {
+    "lsh5": {
+      "decisions_equal": 64,
+      "sets_equal": 64
+    },
+    "lsh10": {
+      "decisions_equal": 64,
+      "sets_equal": 63
+    },
+    "dual": {
+      "decisions_equal": 64,
+      "sets_equal": 64
+    }
+  },
+  "methods": {
+    "lsh5": {
+      "median_ms": 15.74115,
+      "p95_ms": 16.656025
+    },
+    "lsh10": {
+      "median_ms": 15.9042,
+      "p95_ms": 16.741419999999998
+    },
+    "dual": {
+      "median_ms": 18.346049999999998,
+      "p95_ms": 19.478409999999997
+    },
+    "dual_serial": {
+      "median_ms": 20.220100000000002,
+      "p95_ms": 20.920524999999998
+    },
+    "lsh5_serial": {
+      "median_ms": 16.0276,
+      "p95_ms": 17.129795
+    }
+  },
+  "paired_extra_ms": 2.6011000000000006
+}

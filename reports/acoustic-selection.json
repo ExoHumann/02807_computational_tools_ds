@@ -1,0 +1,19 @@
+{
+  "development_known": 512,
+  "development_misses": 16,
+  "methods": {
+    "triplet": {
+      "misses_recovered": 0,
+      "acoustic_top5": 17
+    },
+    "offset_pairs": {
+      "misses_recovered": 4,
+      "acoustic_top5": 370
+    },
+    "offset_pairs_aligned": {
+      "misses_recovered": 5,
+      "acoustic_top5": 399
+    }
+  },
+  "selected": "offset_pairs_aligned"
+}
