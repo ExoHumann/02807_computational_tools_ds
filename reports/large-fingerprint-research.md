@@ -16,6 +16,12 @@ The three-way distortion accounts for 36 of the 52 TikTok-like misses. The distr
 
 To repeat this diagnostic, run `python scripts/large_development_ranks.py` from the repository root in the medium PyTorch CUDA environment with the frozen `data/large/references.npz` and `data/medium/runner-up-queries.npz` in place. [Large input checksums and build](https://github.com/nickiliak/02807_computational_tools_ds/pull/7)
 
+## When a different ID points to the same audio
+
+We also audited all ten exact-search false accepts allowed by the recalibrated rule on **development** unknowns. Nine of ten source–winner pairs share the listed artist and six share both artist and title. We decoded the clean excerpts, downmixed to mono and resampled to 4 kHz. Four pairs were sample-identical for the entire resulting waveform. Across seven pairs, at least one non-silent five-second source window had a Pearson correlation of 0.95 or higher at an offset in the winning excerpt. For example, IDs 007545 and 003349 both list “Chez Nobody” by Antiguo Automata Mexicano and gave identical full converted waveforms.
+
+Under strict track-ID scoring, all ten are false accepts. The four matching waveforms demonstrate why raising the score or gap cannot reliably distinguish archive IDs for indistinguishable audio. The ten selected errors establish neither the prevalence of duplicates in the catalogue nor the true field false-accept rate. For a recording-identity test, verify duplicate groups independently, remove whole groups when sampling unknowns, then evaluate on fresh held-out groups. Keep the original test counts for comparison. The audit can be reproduced with `python scripts/large_impostor_audit.py` in the medium CUDA PyTorch environment, after recalibration. [Pair-level evidence](large-development-impostors.json)
+
 ## What other systems have demonstrated
 
 | Source | Measured result | Experiment it motivates here |
@@ -29,6 +35,8 @@ To repeat this diagnostic, run `python scripts/large_development_ranks.py` from 
 Those top-1 rates measure whether the winner is correct when a reference is present. Our open-set outcome counts correct accepted titles **and** false accepts on absent recordings. A system can score highly on the first measure and fail the second.
 
 For an external test on real mixtures, the BAF authors provide annotated TV audio with roughly 80% of annotated time spent on background music. Audio is available upon request. BAF tests speech and competing sounds in broadcasts. The paired FMA phone pilot answers the separate question of what a loudspeaker, room and microphone do to the same excerpt. [BAF dataset](https://zenodo.org/records/6868083) · [Paper and baseline code](https://github.com/guillemcortes/baf-dataset)
+
+**A real phone benchmark already exists.** Li's 2026 POLARIS preprint supplies SD-RR, re-recorded music captured using one laptop and one smartphone. Its adaptive, training-free landmark method reached 84.61% top-1 against neural NMFP's 74.33% on SD-RR. The ordering reversed on the paper's pitch- and tempo-preserving PEX subset, where NMFP reached 98.99% and POLARIS-A reached 93.93%. Both comparisons are closed-set. SD-RR gives us an immediate external capture test with its own reference tracks before recording any FMA songs. [Paper, Table 2](https://arxiv.org/abs/2609.14820) · [Official data loader](https://github.com/JihengLi/POLARIS#data)
 
 ## Next experiment
 

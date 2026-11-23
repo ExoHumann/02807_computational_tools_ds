@@ -1,0 +1,182 @@
+[
+  {
+    "source_id": 47921,
+    "winning_id": 36337,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "Dumbo Gets Mad",
+      "Eclectic Prawn"
+    ],
+    "winning_artist_title": [
+      "Dumbo Gets Mad",
+      "Eclectic Prawn"
+    ],
+    "top_score": 0.9472802877426147,
+    "gap": 0.419059157371521,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 3,
+    "max_five_second_correlation": 0.9660821460633344
+  },
+  {
+    "source_id": 60593,
+    "winning_id": 64928,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "The Feeling of Love",
+      "The Feeling of Love Live at OCCII"
+    ],
+    "winning_artist_title": [
+      "Noise Problems Selections",
+      "Feeling of Love"
+    ],
+    "top_score": 0.9314004182815552,
+    "gap": 0.2000829577445984,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 0,
+    "max_five_second_correlation": 0.6692161057407525
+  },
+  {
+    "source_id": 7545,
+    "winning_id": 3349,
+    "identical_full_mono_4khz_waveform": true,
+    "source_artist_title": [
+      "Antiguo Automata Mexicano",
+      "Chez Nobody"
+    ],
+    "winning_artist_title": [
+      "Antiguo Automata Mexicano",
+      "Chez Nobody"
+    ],
+    "top_score": 0.9699181318283081,
+    "gap": 0.3487173318862915,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 6,
+    "max_five_second_correlation": 1.0000000000000007
+  },
+  {
+    "source_id": 86761,
+    "winning_id": 74348,
+    "identical_full_mono_4khz_waveform": true,
+    "source_artist_title": [
+      "Marco Trovatello",
+      "Be Sweet"
+    ],
+    "winning_artist_title": [
+      "Marco Trovatello",
+      "Be Sweet"
+    ],
+    "top_score": 0.8931273221969604,
+    "gap": 0.25523364543914795,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 6,
+    "max_five_second_correlation": 1.0000000000000007
+  },
+  {
+    "source_id": 116023,
+    "winning_id": 77866,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "shhh... vs Sci Fi Industries",
+      "The Circle"
+    ],
+    "winning_artist_title": [
+      "shhh... vs Sci Fi Industries",
+      "Arctic Circle"
+    ],
+    "top_score": 0.9438297748565674,
+    "gap": 0.3809990882873535,
+    "nonoverlapping_source_windows": 5,
+    "windows_at_or_above_0.95": 0,
+    "max_five_second_correlation": 0.592261075424155
+  },
+  {
+    "source_id": 62197,
+    "winning_id": 68671,
+    "identical_full_mono_4khz_waveform": true,
+    "source_artist_title": [
+      "William Hellfire",
+      "Thief (King Ghidorah!)"
+    ],
+    "winning_artist_title": [
+      "William Hellfire",
+      "Thief (King Ghidorah!)"
+    ],
+    "top_score": 0.9535722732543945,
+    "gap": 0.39642333984375,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 6,
+    "max_five_second_correlation": 1.0000000000000004
+  },
+  {
+    "source_id": 72028,
+    "winning_id": 59276,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "Small Radio",
+      "I Am Ricky Richardo"
+    ],
+    "winning_artist_title": [
+      "Small Radio",
+      "I Am Ricky Richardo"
+    ],
+    "top_score": 0.890011727809906,
+    "gap": 0.29302269220352173,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 6,
+    "max_five_second_correlation": 0.999960043169349
+  },
+  {
+    "source_id": 114065,
+    "winning_id": 92464,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "Decktonic",
+      "This Love Is Faux Real (Raw Mix)"
+    ],
+    "winning_artist_title": [
+      "Decktonic",
+      "This Love Is Faux Real"
+    ],
+    "top_score": 0.9054953455924988,
+    "gap": 0.3362343907356262,
+    "nonoverlapping_source_windows": 5,
+    "windows_at_or_above_0.95": 0,
+    "max_five_second_correlation": 0.23913413180135076
+  },
+  {
+    "source_id": 116706,
+    "winning_id": 116697,
+    "identical_full_mono_4khz_waveform": true,
+    "source_artist_title": [
+      "Howie Mitchell",
+      "Henry Martin"
+    ],
+    "winning_artist_title": [
+      "Howie Mitchell",
+      "Henry Martin"
+    ],
+    "top_score": 0.971895694732666,
+    "gap": 0.34968411922454834,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 6,
+    "max_five_second_correlation": 1.0000000000000007
+  },
+  {
+    "source_id": 36460,
+    "winning_id": 34332,
+    "identical_full_mono_4khz_waveform": false,
+    "source_artist_title": [
+      "The Tudor Consort",
+      "Kyrie Eleison"
+    ],
+    "winning_artist_title": [
+      "The Tudor Consort",
+      "Giovanni Animuccia - Kyrie"
+    ],
+    "top_score": 0.9653283953666687,
+    "gap": 0.24814951419830322,
+    "nonoverlapping_source_windows": 6,
+    "windows_at_or_above_0.95": 5,
+    "max_five_second_correlation": 0.9939949004192987
+  }
+]
