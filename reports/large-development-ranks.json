@@ -1,0 +1,139 @@
+{
+  "split": "Large open-set catalogue, known development queries only",
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "windows": 459911,
+  "searchable_tracks": 104681,
+  "known_songs": 512,
+  "by_family": {
+    "standard": {
+      "queries": 512,
+      "strict_top1": 490,
+      "top5_even_if_ties_lose": 509,
+      "top5_if_ties_win": 509,
+      "top5_recoverable_top1_misses": 19,
+      "outside_top5_even_if_ties_win": 3
+    },
+    "tiktok": {
+      "queries": 512,
+      "strict_top1": 460,
+      "top5_even_if_ties_lose": 495,
+      "top5_if_ties_win": 495,
+      "top5_recoverable_top1_misses": 35,
+      "outside_top5_even_if_ties_win": 17
+    }
+  },
+  "by_distortion": {
+    "band_pass": {
+      "queries": 44,
+      "strict_top1": 43,
+      "top5_even_if_ties_lose": 44,
+      "top5_if_ties_win": 44,
+      "top5_recoverable_top1_misses": 1,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "compression": {
+      "queries": 119,
+      "strict_top1": 117,
+      "top5_even_if_ties_lose": 119,
+      "top5_if_ties_win": 119,
+      "top5_recoverable_top1_misses": 2,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "echo": {
+      "queries": 66,
+      "strict_top1": 64,
+      "top5_even_if_ties_lose": 66,
+      "top5_if_ties_win": 66,
+      "top5_recoverable_top1_misses": 2,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "high_pass": {
+      "queries": 42,
+      "strict_top1": 42,
+      "top5_even_if_ties_lose": 42,
+      "top5_if_ties_win": 42,
+      "top5_recoverable_top1_misses": 0,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "low_pass": {
+      "queries": 64,
+      "strict_top1": 61,
+      "top5_even_if_ties_lose": 64,
+      "top5_if_ties_win": 64,
+      "top5_recoverable_top1_misses": 3,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "noise": {
+      "queries": 53,
+      "strict_top1": 47,
+      "top5_even_if_ties_lose": 50,
+      "top5_if_ties_win": 50,
+      "top5_recoverable_top1_misses": 3,
+      "outside_top5_even_if_ties_win": 3
+    },
+    "pitch_shift": {
+      "queries": 48,
+      "strict_top1": 46,
+      "top5_even_if_ties_lose": 48,
+      "top5_if_ties_win": 48,
+      "top5_recoverable_top1_misses": 2,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "reverb": {
+      "queries": 48,
+      "strict_top1": 48,
+      "top5_even_if_ties_lose": 48,
+      "top5_if_ties_win": 48,
+      "top5_recoverable_top1_misses": 0,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "reverb+noise": {
+      "queries": 52,
+      "strict_top1": 49,
+      "top5_even_if_ties_lose": 52,
+      "top5_if_ties_win": 52,
+      "top5_recoverable_top1_misses": 3,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "speed_up": {
+      "queries": 132,
+      "strict_top1": 128,
+      "top5_even_if_ties_lose": 132,
+      "top5_if_ties_win": 132,
+      "top5_recoverable_top1_misses": 4,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "speed_up+voice_over+compression": {
+      "queries": 127,
+      "strict_top1": 91,
+      "top5_even_if_ties_lose": 111,
+      "top5_if_ties_win": 111,
+      "top5_recoverable_top1_misses": 20,
+      "outside_top5_even_if_ties_win": 16
+    },
+    "time_stretch": {
+      "queries": 51,
+      "strict_top1": 51,
+      "top5_even_if_ties_lose": 51,
+      "top5_if_ties_win": 51,
+      "top5_recoverable_top1_misses": 0,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "time_stretch+pitch_shift": {
+      "queries": 44,
+      "strict_top1": 39,
+      "top5_even_if_ties_lose": 44,
+      "top5_if_ties_win": 44,
+      "top5_recoverable_top1_misses": 5,
+      "outside_top5_even_if_ties_win": 0
+    },
+    "voice_over": {
+      "queries": 134,
+      "strict_top1": 124,
+      "top5_even_if_ties_lose": 133,
+      "top5_if_ties_win": 133,
+      "top5_recoverable_top1_misses": 9,
+      "outside_top5_even_if_ties_win": 1
+    }
+  }
+}
