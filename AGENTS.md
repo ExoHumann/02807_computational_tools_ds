@@ -16,6 +16,9 @@
 * To make fingerprints, use `uv run python -m afp.fingerprint cache|train|encode` (see `README.md`). `cache` downloads
     MuQ weights (about 1.2 GB) on first use and runs the model over about 62,000 windows for `small`; do not run it
     unless asked.
+* To evaluate the k-means IVF index, use `uv run python -m afp.cluster [--k ...] [--nprobe ...]`. It needs the
+    fingerprints from `afp.fingerprint encode` and runs on CPU in minutes.
+* To find tracks that share audio with DBSCAN, use `uv run python -m afp.related [--min-similarity 0.9]`.
 * The project uses `invoke` for task management (`test`, `data`, `fmt`). To see available tasks, use
     `uv run invoke --list` or refer to the `tasks.py` file.
 * The project uses `pre-commit` for managing pre-commit hooks. To run all hooks on all files, use
