@@ -30,9 +30,7 @@ class GPUAngularLSH:
     to reranking the unique union. Work is reported as window visits, including repeats.
     """
 
-    def __init__(
-        self, references: cp.ndarray, tracks: cp.ndarray, *, bits: int, tables: int, seed: int = 2807
-    ) -> None:
+    def __init__(self, references: cp.ndarray, tracks: cp.ndarray, *, bits: int, tables: int, seed: int = 2807) -> None:
         """Build the index on-device from FP32 unit vectors and integer FMA track IDs."""
         if references.ndim != 2 or references.shape[1] != 256 or not len(references):
             raise ValueError("Expected a nonempty matrix of 256-dimensional fingerprints")
@@ -79,8 +77,22 @@ class GPUAngularLSH:
         local_rows = cp.empty((n, parts), dtype=cp.int32)
         local_counts = cp.empty((n, parts), dtype=cp.int32)
         params = tuple(map(np.int32, (len(self.refs), self.bits, self.tables, probes, stripes)))
-        self.scan((parts, n), (128,), (queries, projections, self.refs, self.order, self.offsets,
-                                      *params, local_scores, local_rows, local_counts))
-        self.finish((n,), (32,), (local_scores, local_rows, local_counts, self.tracks, np.int32(parts),
-                                 track, score, count))
+        self.scan(
+            (parts, n),
+            (128,),
+            (
+                queries,
+                projections,
+                self.refs,
+                self.order,
+                self.offsets,
+                *params,
+                local_scores,
+                local_rows,
+                local_counts,
+            ),
+        )
+        self.finish(
+            (n,), (32,), (local_scores, local_rows, local_counts, self.tracks, np.int32(parts), track, score, count)
+        )
         return track, score, count

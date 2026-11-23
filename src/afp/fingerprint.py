@@ -253,13 +253,16 @@ def cache_clips(
             "voice_over_db": np.array(voice_db, dtype=np.float32),
         }
         path = out_dir / f"shard_{shard:04d}.npz"
-        return path, arrays, np.stack(clean) if with_clean else None, np.stack(distorted), time.perf_counter() - prepare_started
+        return path, arrays, np.stack(clean) if with_clean else None, np.stack(
+            distorted
+        ), time.perf_counter() - prepare_started
 
     total_shards = math.ceil(n_clips / clips_per_shard)
     pending = [shard for shard in range(total_shards) if not (out_dir / f"shard_{shard:04d}.npz").exists()]
     futures = {}
     next_pending = 0
     with ThreadPoolExecutor(max_workers=prep_workers) as executor:
+
         def submit_bounded() -> None:
             nonlocal next_pending
             while next_pending < len(pending) and len(futures) < prep_workers:

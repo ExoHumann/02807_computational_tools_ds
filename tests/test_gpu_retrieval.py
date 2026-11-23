@@ -34,7 +34,7 @@ def test_bucket_union_matches_across_devices_and_query_batch_sizes():
             windows = []
             for table, key in enumerate(keys):
                 first, second = weights[nearby[table, :2]]
-                for mask in [0, first, second, first | second][:probes + 1]:
+                for mask in [0, first, second, first | second][: probes + 1]:
                     windows.extend(np.flatnonzero(signatures[:, table] == (key ^ mask)).tolist())
             rows = np.unique(windows)
             if len(rows):

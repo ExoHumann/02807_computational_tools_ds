@@ -16,10 +16,9 @@ from afp.gpu_retrieval import gpu_exact
 
 def predict(references: cp.ndarray, tracks: cp.ndarray, queries: np.ndarray) -> np.ndarray:
     """Run cosine search in bounded GPU batches and transfer only the predicted tracks."""
-    return np.concatenate([
-        gpu_exact(references, tracks, cp.asarray(queries[i : i + 256]))[0].get()
-        for i in range(0, len(queries), 256)
-    ])
+    return np.concatenate(
+        [gpu_exact(references, tracks, cp.asarray(queries[i : i + 256]))[0].get() for i in range(0, len(queries), 256)]
+    )
 
 
 def load_vectors(path: Path) -> tuple[np.ndarray, np.ndarray]:

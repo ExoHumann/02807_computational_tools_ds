@@ -152,9 +152,15 @@ def test_audio_cache_and_partial_resume_preserve_augmented_pairs(tmp_path):
         rows.append({"track_id": track, "path": path.relative_to(tmp_path).as_posix()})
     manifest = pd.DataFrame(rows)
     args = {
-        "manifest": manifest, "track_ids": np.array([7, 8]), "processed_dir": tmp_path,
-        "backbone": FakeBackbone(), "with_clean": True, "seed": 12, "batch_size": 2,
-        "clips_per_shard": 2, "categories": (("noise",),),
+        "manifest": manifest,
+        "track_ids": np.array([7, 8]),
+        "processed_dir": tmp_path,
+        "backbone": FakeBackbone(),
+        "with_clean": True,
+        "seed": 12,
+        "batch_size": 2,
+        "clips_per_shard": 2,
+        "categories": (("noise",),),
     }
     cache_clips("uncached", n_clips=5, **args)
     one_track_gib = (12 * SAMPLE_RATE * 2) / (1 << 30)
