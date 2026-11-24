@@ -22,7 +22,8 @@ class Recognizer:
         """Load the released Medium artifacts and build the pinned 64-table bucket index."""
         directory = MEDIUM/"data/processed"
         model = os.getenv("MUQ_MODEL_DIR", str(MEDIUM/"hf-cache/hub/models--OpenMuQ--MuQ-large-msd-iter/snapshots"/REVISION))
-        self.encoder = MuQBackbone(device="cuda", repo=model, autocast_dtype=torch.bfloat16)
+        precision = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else None
+        self.encoder = MuQBackbone(device="cuda", repo=model, autocast_dtype=precision)
         self.head = load_head(MEDIUM/"models/projection_head.pt").to("cuda")
         with np.load(directory/"fingerprints/references.npz") as z:
             self.index = AngularLSH(z["vectors"],z["track_id"],bits=10,tables=64,seed=2807)

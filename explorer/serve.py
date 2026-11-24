@@ -69,15 +69,19 @@ if __name__=="__main__":
     from gpu_match import Recognizer
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port",type=int,default=8327)
+    parser.add_argument("--cloud", action="store_true", help="Serve authenticated inference on the container interface.")
     args=parser.parse_args()
+    if args.cloud and not os.environ.get("SIGNAL_RELAY_TOKEN"):
+        parser.error("Cloud mode requires SIGNAL_RELAY_TOKEN.")
     model=Recognizer()
     def server(port,relay):
-        service=ThreadingHTTPServer(("127.0.0.1",port),functools.partial(Handler,directory=str(HERE/"public")))
+        host = "0.0.0.0" if args.cloud else "127.0.0.1"
+        service=ThreadingHTTPServer((host,port),functools.partial(Handler,directory=str(HERE/"public")))
         service.model=model
         service.inference_only=relay
         service.key=os.environ.get("SIGNAL_RELAY_TOKEN","")
         return service
-    if os.environ.get("SIGNAL_RELAY_TOKEN"):
+    if not args.cloud and os.environ.get("SIGNAL_RELAY_TOKEN"):
         threading.Thread(target=server(args.port+1,True).serve_forever,daemon=True).start()
-    server(args.port,False).serve_forever()
+    server(args.port,args.cloud).serve_forever()
 

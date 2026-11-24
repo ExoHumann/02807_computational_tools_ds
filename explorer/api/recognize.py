@@ -3,6 +3,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -38,9 +39,11 @@ class handler(BaseHTTPRequestHandler):
             request = urllib.request.Request(url,data=raw,headers={"Content-Type":"application/octet-stream",
                                              "Authorization":"Bearer "+token})
             try:
-                with urllib.request.urlopen(request,timeout=7) as response:
+                with urllib.request.urlopen(request,timeout=205) as response:
                     answer = json.load(response)
                 if isinstance(answer.get("accepted"),bool):
+                    if urllib.parse.urlsplit(url).hostname.endswith(".azurecontainerapps.io"):
+                        answer["engine"] = f"Azure · {answer['engine']}"
                     return self.reply(200,answer)
             except (OSError, ValueError):
                 pass

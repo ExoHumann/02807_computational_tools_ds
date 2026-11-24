@@ -138,7 +138,7 @@ async function decodeUpload(file) {
   }
 }
 async function recognize(buffer) {
-  status("Searching the catalogue", "Encoding ten seconds of mono audio and comparing fingerprints…");
+  status("Searching the catalogue", "Encoding your clip. The first query after an idle period may need to start the GPU.");
   const offline = new OfflineAudioContext(1, samplesNeeded, sampleRate);
   const source = offline.createBufferSource();
   source.buffer = buffer;
@@ -151,7 +151,7 @@ async function recognize(buffer) {
     const v=Math.max(-1,Math.min(1,mono[i]));
     bytes.setInt16(2*i,Math.round(v*(v<0 ? 32768 : 32767)),true);
   }
-  const reply = await fetch("/api/recognize",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:bytes.buffer,signal:AbortSignal.timeout(90000)});
+  const reply = await fetch("/api/recognize",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:bytes.buffer,signal:AbortSignal.timeout(240000)});
   if(!reply.ok){
     const message=await reply.json().catch(()=>({}));
     throw Error(typeof message.error==="string" ? message.error : "Recognition service returned HTTP "+reply.status+".");

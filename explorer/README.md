@@ -14,7 +14,9 @@ The search chart compares the exact, LSH and IVF runs in PR 13 for 7,458 standar
 
 ## Run
 
-For Vercel, select the project's `explorer` root. It serves `public/` and the two functions in `api/`. Deployment does not need the neural model. An optional HTTPS worker can be configured with server-side `SIGNAL_GPU_URL` (full recognition URL) and `SIGNAL_GPU_TOKEN`; the function falls back to landmarks if the worker is unavailable. Cold workers exceeding the seven-second upstream timeout also use the fallback.
+For Vercel, select the project's `explorer` root. It serves `public/` and the two functions in `api/`. Configure the neural worker through server-side `SIGNAL_GPU_URL` (full HTTPS recognition URL) and `SIGNAL_GPU_TOKEN`. The proxy allows 205 seconds for a sleeping GPU to start and process the clip. If the worker is unavailable, the hosted 24-track landmark matcher handles the request and the result names that backend.
+
+The Azure build packages the pinned MuQ weights, the Medium projection head, reference fingerprints and track metadata. From the repository root use `explorer/cloud/build-image.ps1 -Tag <registry>/<image>:<tag>` and push the image to the private registry. The [deployment script](cloud/deploy.ps1) uses an existing Container Apps environment, consumption T4 profile, registry pull identity and the current Azure CLI subscription. It stores the generated bearer key in the supplied Windows user-encrypted key file. HTTP requests wake the worker and the replica range is zero to one. T4 inference uses FP32 for the encoder.
 
 For local neural recognition use the repository GPU environment, the Medium release directory and head, and the pinned OpenMuQ checkpoint. Set `MUQ_MODEL_DIR` to the local model directory if it is outside the original cache location. Run `./explorer/start.ps1` and open http://127.0.0.1:8327. Stop with `./explorer/stop.ps1`. The web service uses loopback. No tunnel is required for a local test.
 
