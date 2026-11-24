@@ -36,7 +36,7 @@ $body=@{
    ingress=@{external=$true;targetPort=8080;transport='http';allowInsecure=$false}
   }
   template=@{
-   containers=@(@{name='matcher';image=$Image;resources=@{cpu=2.0;memory='8Gi';gpu=1}
+   containers=@(@{name='matcher';image=$Image;resources=@{cpu=2.0;memory='8Gi'}
      env=@(@{name='SIGNAL_RELAY_TOKEN';secretRef='recognition-key'})
      probes=@(@{type='Startup';tcpSocket=@{port=8080};periodSeconds=5;failureThreshold=60})
    })
@@ -49,4 +49,3 @@ if ($LASTEXITCODE) { throw 'Management API authentication failed.' }
 $url="https://management.azure.com$prefix/Microsoft.App/containerApps/${App}?api-version=2025-07-01"
 $result=Invoke-RestMethod -Method Put -Uri $url -Headers @{Authorization="Bearer $token"} -ContentType application/json -Body ($body|ConvertTo-Json -Depth 12 -Compress)
 $result.properties | Select-Object provisioningState,workloadProfileName
-

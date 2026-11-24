@@ -20,4 +20,3 @@ Copy-Item -LiteralPath "$blobs/fec6c73f7b811281b440462fcf4d98c7953c3d94" -Destin
 Copy-Item -LiteralPath "$PSScriptRoot/Dockerfile" -Destination "$ctx/Dockerfile"
 docker build --platform linux/amd64 --tag $Tag $ctx
 exit $LASTEXITCODE
-

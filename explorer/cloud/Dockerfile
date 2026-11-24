@@ -8,4 +8,3 @@ COPY data/medium /app/data/medium
 COPY checkpoint /app/checkpoint
 EXPOSE 8080
 CMD ["python","explorer/serve.py","--cloud","--port","8080"]
-
