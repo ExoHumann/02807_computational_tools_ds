@@ -1,7 +1,8 @@
-"""Retrieve only allowlisted CC0 recordings from the official FMA Medium archive."""
+"""Retrieve only catalogued recordings from the official FMA Medium archive."""
 import bz2
 import hashlib
 import json
+import zlib
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from urllib.request import Request, urlopen
@@ -28,7 +29,9 @@ def serve_sample(handler):
             raise ValueError("Incomplete sample")
         decoder = bz2.BZ2Decompressor()
         audio = decoder.decompress(compressed, max_length=track["size"] + 1)
-        if not decoder.eof or len(audio) != track["size"] or hashlib.sha256(audio).hexdigest() != track["sha256"]:
+        if not decoder.eof or len(audio) != track["size"] or zlib.crc32(audio) != track["crc"]:
+            raise ValueError("Sample failed archive checksum")
+        if "sha256" in track and hashlib.sha256(audio).hexdigest() != track["sha256"]:
             raise ValueError("Sample failed verification")
     except (OSError, ValueError, EOFError):
         return handler.send_error(502, "This recording could not be loaded")

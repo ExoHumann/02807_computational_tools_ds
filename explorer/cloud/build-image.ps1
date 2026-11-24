@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $ctx = Join-Path $repo 'data/signal-index-image'
 $inputs = @(
- 'explorer/serve.py','explorer/gpu_match.py',
+ 'explorer/serve.py','explorer/gpu_match.py','explorer/search_trace.py',
  'data/medium/data/processed/manifest.csv','data/medium/data/processed/fingerprints/references.npz',
  'data/medium/models/projection_head.pt'
 )

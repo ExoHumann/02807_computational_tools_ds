@@ -45,24 +45,30 @@ def catalogue():
 def alignment(query, reference):
     """Measure support for the best time offset at the original playback rate."""
     if not len(query) or not len(reference):
-        return 0.
+        return 0., None
     qi, ri = np.where(np.abs(query[:,0,None]-reference[:,0]) <= .85)
     if not len(qi):
-        return 0.
+        return 0., None
     offsets = np.rint((reference[ri,1]-query[qi,1])*.5).astype(int)
     votes = np.bincount(offsets-offsets.min())
-    return float(np.convolve(votes,np.ones(3)).max()/len(query))
+    smoothed = np.convolve(votes, np.ones(3))
+    best = int(smoothed.argmax())
+    return float(smoothed[best]/len(query)), float((best - 1 + offsets.min()) * .032)
 
 
 def identify(payload):
     """Recognise an excerpt against the CC0 subset or abstain."""
     q = peaks(np.frombuffer(payload, dtype="<i2").astype("f4")/32768)
     t = perf_counter()
-    hits = sorted(((alignment(q, peaks_), int(tid), str(title), str(artist))
-                   for tid,title,artist,peaks_ in catalogue()), reverse=True)
-    score, tid, title, artist = hits[0]
+    hits = []
+    for tid, title, artist, reference in catalogue():
+        score, start = alignment(q, reference)
+        hits.append((score, int(tid), str(title), str(artist), start))
+    hits.sort(reverse=True)
+    score, tid, title, artist, start = hits[0]
     gap = score-hits[1][0]
     return dict(accepted=len(q)>=24 and score>=.32 and gap>=.12, title=title, artist=artist,
                 track_id=tid, score=score, gap=gap, lookup_ms=(perf_counter()-t)*1000,
+                trace=dict(kind="landmarks", start=start, peaks=len(q)),
                 engine="Spectral landmarks · 24-track demo")
 

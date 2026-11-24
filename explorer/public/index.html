@@ -45,6 +45,7 @@
             <i></i>
             <div><strong id="status-title">Getting ready</strong><span id="status-detail"></span></div>
           </div>
+          <a href="#search-story" id="follow-result" hidden>Explore this search ↓</a>
           <canvas id="scope" aria-label="Recorded sound wave" hidden></canvas>
         </div>
         <div class="player" id="player">
@@ -81,10 +82,24 @@
                 Choose a song <span aria-hidden="true">⌄</span>
               </button>
             </div>
+            <a href="#search-story" class="sample-follow">Explore this sample’s search ↓</a>
             <p id="player-note" role="status"></p>
             <button id="saved-sample" hidden>Play the saved sample</button>
             <ul id="demo-tracks" aria-label="Choose a sample by title" hidden></ul>
           </div>
+        </div>
+      </section>
+      <section class="story band" id="search-story">
+        <div class="shell">
+          <div class="secthead">
+            <div>
+              <h2>Follow a fingerprint.</h2>
+              <p>
+                Follow your clip into the music library. Hover over a song to meet it, then pick a piece to hear what the search heard.
+              </p>
+            </div>
+          </div>
+          <div id="ruler">Loading the song map…</div>
         </div>
       </section>
       <section class="shell chapter" id="bench">
@@ -138,20 +153,6 @@
               <small>After training</small><strong>93.5<span>%</span></strong>
             </div>
           </div>
-        </div>
-      </section>
-      <section class="story band" id="search-story">
-        <div class="shell">
-          <div class="secthead">
-            <div>
-              <h2>Follow a fingerprint.</h2>
-              <p>
-                How do ten seconds lead to one song? Follow a real clip from its sound, through a box of similar
-                pieces, to the moment the search picked.
-              </p>
-            </div>
-          </div>
-          <div id="ruler">Loading the song map…</div>
         </div>
       </section>
       <section class="explore band" id="queries">

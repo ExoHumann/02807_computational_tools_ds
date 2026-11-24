@@ -1,3 +1,4 @@
+import { publishSearch, stopListening } from "./search-session.js"
 const byId = (id) => document.getElementById(id)
 const audio = new Audio()
 let library = [],
@@ -45,6 +46,8 @@ function choose(track) {
   currentURL = undefined
   loading = undefined
   song = track
+  byId("follow-result").hidden = true
+  publishSearch({ name: track.title, sample: track.track_id })
   byId("sample-title").textContent = track.title
   byId("sample-artist").textContent = track.artist
   byId("player-note").textContent = ""
@@ -123,15 +126,25 @@ export function currentClip() {
   })
   return loading
 }
+export function sampleName() {
+  return song?.title || "Your sample"
+}
+let playbackEpoch = 0
+window.addEventListener("signal-stop-audio", () => {
+  playbackEpoch++
+  audio.pause()
+})
 async function play() {
   if (!audio.paused) {
     audio.pause()
     return
   }
-  const token = selection
+  stopListening()
+  const token = selection,
+    playToken = playbackEpoch
   try {
     await currentClip()
-    if (token === selection && !locked) await audio.play()
+    if (token === selection && playToken === playbackEpoch && !locked) await audio.play()
   } catch (error) {
     if (error.name === "NotAllowedError")
       byId("player-note").textContent = "Your clip is ready. Tap play to listen."

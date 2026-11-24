@@ -9,6 +9,7 @@ import torch
 from afp.embed import MuQBackbone
 from afp.fingerprint import load_head
 from afp.lsh import AngularLSH
+from search_trace import pack_trace
 
 ROOT = Path(__file__).resolve().parent.parent
 MEDIUM = ROOT/"data/medium"
@@ -42,10 +43,11 @@ class Recognizer:
         projections = (query @ index.planes).reshape(index.tables,index.bits)
         keys = (projections >= 0) @ index.weights
         nearest = np.argsort(abs(projections), axis=1, kind="stable")[:,:2]
-        parts = []
+        parts, boxes = [], []
         for key, (a,b), (order, offsets) in zip(keys, nearest, index.buckets, strict=True):
-            for mask in (0, 1<<a, 1<<b, (1<<a)|(1<<b)):
-                k = key ^ mask
+            probes = [int(key ^ mask) for mask in (0, 1<<a, 1<<b, (1<<a)|(1<<b))]
+            boxes.append(probes)
+            for k in probes:
                 parts.append(order[offsets[k]:offsets[k+1]])
         rows = np.unique(np.concatenate(parts))
         if not rows.size:
@@ -54,10 +56,13 @@ class Recognizer:
         best = scores.argmax()
         tid = int(index.track_ids[rows[best]])
         score = float(scores[best])
-        other = scores[index.track_ids[rows]!=tid]
-        gap = float(score-other.max()) if len(other) else 0.
+        others = np.flatnonzero(index.track_ids[rows] != tid)
+        second = others[np.argmax(scores[others])] if len(others) else None
+        gap = float(score-scores[second]) if second is not None else 0.
         elapsed = (perf_counter()-start)*1000
         track = self.metadata.loc[tid]
         return dict(accepted=score>=.749896646 and gap>=.117484212, title=str(track.title), artist=str(track.artist),
-                    score=score, gap=gap, track_id=tid,lookup_ms=elapsed,engine="MuQ + LSH · FMA Medium")
+                    score=score, gap=gap, track_id=tid,lookup_ms=elapsed,
+                    trace=pack_trace(query, projections, boxes, rows, scores, len(index.track_ids), rows[best],
+                                     rows[second] if second is not None else None), engine="MuQ + LSH · FMA Medium")
 

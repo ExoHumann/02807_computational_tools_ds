@@ -1,4 +1,5 @@
-import { currentClip, setPlayerState } from "./player.js"
+import { publishSearch, stopListening, waveform } from "./search-session.js"
+import { currentClip, setPlayerState, sampleName } from "./player.js"
 const seconds = 10
 const sampleRate = 24000
 const samplesNeeded = seconds * sampleRate
@@ -166,7 +167,7 @@ async function decodeUpload(file) {
     URL.revokeObjectURL(url)
   }
 }
-async function recognize(buffer) {
+async function recognize(buffer, name) {
   status("Looking for your song…", "The first search after a break can take about two minutes.")
   const offline = new OfflineAudioContext(1, samplesNeeded, sampleRate)
   const source = offline.createBufferSource()
@@ -202,14 +203,19 @@ async function recognize(buffer) {
     ? result.artist || "Found in the music library."
     : "We couldn’t tell which song this was. Try a clearer part of the recording."
   status(title, label)
+  result.wave = waveform(mono)
+  publishSearch({ name, result })
+  get("follow-result").hidden = false
 }
-async function run(getBuffer) {
+async function run(getBuffer, name) {
   if (busy || !available) return
+  stopListening()
+  get("follow-result").hidden = true
   busy = true
   canvas.hidden = true
   controls()
   try {
-    await recognize(await getBuffer())
+    await recognize(await getBuffer(), name)
   } catch (error) {
     status("Recognition stopped", error.message, true)
   } finally {
@@ -218,12 +224,12 @@ async function run(getBuffer) {
     controls()
   }
 }
-get("record").onclick = () => (cancelCapture ? cancelCapture() : run(capture))
+get("record").onclick = () => (cancelCapture ? cancelCapture() : run(capture, "Your recording"))
 get("upload").onclick = () => get("file").click()
 get("file").onchange = (e) => {
   const file = e.target.files[0]
   e.target.value = ""
-  if (file) run(() => decodeUpload(file))
+  if (file) run(() => decodeUpload(file), "Your upload")
 }
 
-get("try-example").onclick = () => run(currentClip)
+get("try-example").onclick = () => run(currentClip, sampleName())
