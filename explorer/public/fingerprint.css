@@ -529,3 +529,22 @@
 .atlas-transform figure:first-child i {
   background: #c9e995;
 }
+
+.search-atlas .atlas-map-intro {
+  font-size: 0.9rem;
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+}
+.atlas-ruler-guide {
+  font-size: 0.8rem;
+  color: #d6e6d6;
+}
+.atlas-jump {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 2rem;
+  background: #e6eddb;
+  font-size: 0.84rem !important;
+}

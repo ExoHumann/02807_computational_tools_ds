@@ -1,6 +1,6 @@
 import { action, loadPlanes, make } from "./atlas-data.js"
 
-export function fingerprintChecks(parent) {
+export function fingerprintChecks(parent, open) {
   const title = make("h3", "What tips an answer to yes?"),
     intro = make(
       "p",
@@ -18,7 +18,8 @@ export function fingerprintChecks(parent) {
   )
   const note = make("output")
   const sound = make("div", null, "atlas-transform")
-  parent.append(title, sound, intro, bits, info, canvas, slider, note)
+  const jump = action("", () => open(trace.boxes[table][0] ^ (1 << bit)), "atlas-jump")
+  parent.append(title, sound, intro, bits, info, canvas, slider, note, jump)
   let trace,
     table,
     bit = 0,
@@ -74,6 +75,8 @@ export function fingerprintChecks(parent) {
     ;[...bits.children].forEach((n, i) => n.setAttribute("aria-pressed", String(9 - i === bit)))
     const final = trace.projections[table][b]
     const close = trace.boxes[table].slice(1).some((v) => ((v ^ trace.boxes[table][0]) & (1 << b)) !== 0)
+    jump.hidden = !close
+    jump.textContent = "See the box this one answer changes → " + (trace.boxes[table][0] ^ (1 << b))
     info.textContent =
       "Check " +
       (10 - b) +

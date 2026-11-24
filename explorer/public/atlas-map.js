@@ -13,7 +13,12 @@ export function addressRuler(parent, choose) {
   slider.setAttribute("aria-label", "Open a box by number")
   const axis = make("div", null, "atlas-axis")
   axis.append(make("span", "0"), make("span", "512"), make("span", "1,023"))
-  parent.append(full, axis, lens, slider, readout)
+  const guide = make(
+    "p",
+    "Move across the top ruler to magnify 17 boxes below. Tap a box to open it. Taller marks hold more pieces.",
+    "atlas-ruler-guide",
+  )
+  parent.append(guide, full, axis, lens, slider, readout)
   let counts,
     probes = [],
     selected = 0,

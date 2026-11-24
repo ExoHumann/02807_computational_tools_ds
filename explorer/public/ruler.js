@@ -24,6 +24,7 @@ export async function mountRuler(root) {
     <div class="atlas-context"><div><small>Following</small><h3 data-id="title"></h3><p data-id="summary" role="status"></p></div>
     <label>Explore another search<select data-id="example"><option value="">Player selection</option></select></label></div>
     <div data-id="work">
+    <p class="atlas-map-intro" data-id="mapIntro"></p>
     <div class="atlas-tools"><label>Map <select data-id="map"></select></label><div data-id="probes" class="atlas-probes" role="group" aria-label="Boxes opened by this search"></div></div>
     <div class="atlas-field" data-id="ruler"></div>
     <div class="atlas-body"><div class="atlas-box"><div class="atlas-subhead"><h3 data-id="box"></h3><span data-id="box-count"></span></div>
@@ -67,7 +68,12 @@ export async function mountRuler(root) {
           ? "Cancel loading"
           : "▶ Play " + (song ? timeRange(offset ?? song.starts[row - song.first]) : "piece")
   })
-  const inspectChecks = fingerprintChecks(ui.checks)
+  const inspectChecks = fingerprintChecks(ui.checks, (value) => {
+    openBox(value)
+    ui.box.tabIndex = -1
+    ui.box.focus({ preventScroll: true })
+    ui.groups.scrollIntoView({ block: "center" })
+  })
   const drawRuler = addressRuler(ui.ruler, openBox)
   const tiles = groupMap(ui.groups, library, (g) => pin(g.song, bestRow(g.rows), null))
   for (let i = 0; i < 64; i++) ui.map.add(new Option(i + 1 + " of 64", String(i)))
@@ -287,6 +293,9 @@ export async function mountRuler(root) {
       if (trace && (scores.length !== library.total || trace.boxes.length !== 64))
         throw Error("Incompatible search")
       ui.work.hidden = false
+      ui.mapIntro.textContent = trace
+        ? "Each map sorts the same music a different way. The search opens the clip’s own box and three more in case a close answer goes the other way."
+        : "Browse the saved pieces in the music library. This map is separate from the sound-peak search."
       ui.shortcuts.replaceChildren()
       ui.example.value = request.example !== undefined ? String(request.example) : ""
       if (trace) {
