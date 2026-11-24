@@ -1,14 +1,37 @@
-"""Public recognition endpoint. Try the configured GPU once, then use the hosted landmarks."""
+"""Public recognition endpoint with a bounded wait for a busy GPU and a landmark fallback."""
 from http.server import BaseHTTPRequestHandler
 import json
 import os
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from cpu_match import identify
+
+
+def gpu_answer(request):
+    deadline = time.monotonic() + 210
+    for delay in (0, 1, 2):
+        remaining = deadline - time.monotonic() - delay
+        if remaining < 1:
+            break
+        if delay:
+            time.sleep(delay)
+        try:
+            with urllib.request.urlopen(request, timeout=min(205, remaining)) as response:
+                answer = json.load(response)
+            return answer if isinstance(answer, dict) and isinstance(answer.get("accepted"), bool) else None
+        except urllib.error.HTTPError as error:
+            error.close()
+            if error.code != 429:
+                break
+        except (OSError, ValueError):
+            break
+    return None
 
 
 class handler(BaseHTTPRequestHandler):
@@ -38,14 +61,10 @@ class handler(BaseHTTPRequestHandler):
         if url.startswith("https://") and token:
             request = urllib.request.Request(url,data=raw,headers={"Content-Type":"application/octet-stream",
                                              "Authorization":"Bearer "+token})
-            try:
-                with urllib.request.urlopen(request,timeout=205) as response:
-                    answer = json.load(response)
-                if isinstance(answer.get("accepted"),bool):
-                    if urllib.parse.urlsplit(url).hostname.endswith(".azurecontainerapps.io"):
-                        answer["engine"] = f"Azure · {answer['engine']}"
-                    return self.reply(200,answer)
-            except (OSError, ValueError):
-                pass
+            answer = gpu_answer(request)
+            if answer is not None:
+                if urllib.parse.urlsplit(url).hostname.endswith(".azurecontainerapps.io"):
+                    answer["engine"] = f"Azure · {answer['engine']}"
+                return self.reply(200,answer)
         return self.reply(200,identify(raw))
 
