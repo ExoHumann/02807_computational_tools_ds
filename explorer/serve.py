@@ -32,6 +32,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(404,{})
         if self.path == "/api/health":
             return self.reply(200,dict(recognition=True,engine="MuQ + LSH · FMA Medium"))
+        if self.path.partition("?")[0] == "/api/sample":
+            from sample_audio import serve_sample
+            return serve_sample(self)
         return super().do_GET()
 
     def do_POST(self):

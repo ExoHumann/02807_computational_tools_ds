@@ -1,132 +1,284 @@
-import {scorePlot} from "./scatter.js";
-import "./audio.js";
-const get = id => document.getElementById(id);
-const number = new Intl.NumberFormat("en");
-const optionName = key => ({tiktok:"TikTok-like",queries_tiktok:"TikTok-like",queries:"Standard",standard:"Standard",lsh:"LSH",ivf:"IVF",exact:"Exact cosine"})[String(key).toLowerCase()] || String(key).replace(/^./, c=>c.toUpperCase());
-const format = value => Number.isFinite(value) ? value.toFixed(3) : "—";
-const element = (tag, text, className) => {
-  const el=document.createElement(tag);
-  if (text != null) el.textContent=text;
-  if (className) el.className=className;
-  return el;
-};
-function populate(id, values) {
-  for (const value of [...new Set(values)]) get(id).add(new Option(optionName(value),value));
+import { scorePlot } from "./scatter.js"
+import { mountRuler } from "./ruler.js"
+import "./audio.js"
+
+const get = (id) => document.getElementById(id)
+const count = (value) => value.toLocaleString("en")
+function el(tag, text, className) {
+  const node = document.createElement(tag)
+  if (text != null) node.textContent = text
+  if (className) node.className = className
+  return node
+}
+const outcome = (q) => (!q.accepted ? "No guess" : q.correct ? "Right song" : "Wrong song")
+const title = (q) => q.title || "Track " + q.track
+const methods = {
+  exact: ["Check every clip", "Exact search"],
+  lsh: ["Look in matching boxes", "LSH"],
+  ivf: ["Look in similar groups", "IVF"],
+}
+const effects = {
+  voice_over: "a voice talking over the music",
+  speed_up: "faster playback",
+  compression: "compressed audio",
+  reverb: "room reflections",
+  time_stretch: "a change in tempo",
+  pitch_shift: "a change in pitch",
+  low_pass: "muffled high notes",
+  high_pass: "quieter low notes",
+  noise: "background noise",
+  band_pass: "only the middle notes",
+  echo: "an echo",
 }
 
-function benchmarks(methods) {
-  populate("catalogue", methods.map(row=>row.catalogue));
-  populate("family", methods.map(row=>row.family));
-  const large=methods.find(row=>row.catalogue.toLowerCase()==="large");
-  if(large) get("catalogue").value=large.catalogue;
-  function update() {
-    const metric=get("metric").value;
-    const items=methods.filter(row=>row.catalogue===get("catalogue").value && row.family===get("family").value);
-    const val=row=>metric==="accuracy" ? row.correct/row.total*100 : row[metric];
-    const max=metric==="accuracy" ? 100 : Math.max(...items.map(val));
-    const chart=get("chart");
-    chart.replaceChildren();
-    for(const row of items){
-      const v=val(row);
-      const line=element("div",null,"barrow");
-      const rail=element("div",null,"bar-track");
-      const bar=element("div",null,"bar-fill");
-      bar.style.width=(100*v/max)+"%";
-      rail.append(bar);
-      const text=metric==="accuracy" ? v.toFixed(2)+"%" : metric==="ms" ? v.toFixed(3)+" ms" : number.format(Math.round(v))+"/s";
-      line.append(element("b",optionName(row.method)),rail,element("strong",text));
-      chart.append(line);
-    }
-    const notes={accuracy:"Top-1 compares the highest-ranked archive ID with the source. "+number.format(items[0]?.total || 0)+" clips per method; axis 0–100%.",ms:"Warm index and fingerprints on one RTX 4090. Median lookup in milliseconds; shorter is faster. Audio encoding excluded.",qps:"Warm GPU throughput at batch size 128. Longer bars mean more query fingerprints searched per second."};
-    get("chart-note").textContent=notes[metric];
+function benchmarks(measurements) {
+  const state = { catalogue: "large", family: "standard", metric: "accuracy" }
+  const headings = {
+    accuracy: "How many clips got the right title?",
+    ms: "How long did one lookup take?",
+    qps: "How many clips in one second?",
   }
-  ["catalogue","family","metric"].forEach(id=>get(id).addEventListener("change",update));
-  update();
+  function draw() {
+    const { catalogue, family, metric } = state
+    const timed = metric !== "accuracy"
+    get("family").disabled = timed
+    const rows = measurements.filter((r) => r.catalogue === catalogue && r.family === family)
+    const value = (r) => (timed ? r[metric] : (100 * r.correct) / r.total)
+    const max = timed ? Math.max(...rows.map(value)) : 100
+    get("chart-title").textContent = headings[metric]
+    get("chart").replaceChildren(
+      ...rows.map((row) => {
+        const line = el("div", null, "barrow")
+        const head = el("div", null, "barhead"),
+          name = el("span", methods[row.method][0])
+        name.append(el("small", methods[row.method][1]))
+        const v = value(row)
+        head.append(
+          name,
+          el(
+            "b",
+            metric === "accuracy"
+              ? v.toFixed(1) + "%"
+              : metric === "ms"
+                ? v.toFixed(3) + " ms"
+                : count(Math.round(v)),
+          ),
+        )
+        const track = el("div", null, "bar-track"),
+          bar = el("div", null, "bar-fill")
+        bar.dataset.method = row.method
+        bar.style.width = (100 * v) / max + "%"
+        track.append(bar)
+        line.append(head, track)
+        return line
+      }),
+    )
+    const boxes = rows.find((r) => r.method === "lsh")
+    const exact = rows.find((r) => r.method === "exact")
+    const changed =
+      family === "standard" ? "such as noise and echo" : "such as faster playback and talking over the music"
+    get("chart-note").textContent =
+      metric === "accuracy"
+        ? "The box search named " +
+          count(boxes.correct) +
+          " of " +
+          count(boxes.total) +
+          " clips with changes " +
+          changed +
+          ". Each bar counts the first guess."
+        : metric === "ms"
+          ? "The box search was " +
+            (exact.ms / boxes.ms).toFixed(2) +
+            "× faster than checking every clip. We timed one lookup at a time on the same graphics card, with the fingerprints ready."
+          : "Longer is faster. Each method searched 128 ready-made fingerprints at a time on the same graphics card."
+  }
+  for (const key of Object.keys(state)) {
+    const buttons = [...get(key).querySelectorAll("button")]
+    function mark() {
+      buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.value === state[key])))
+    }
+    buttons.forEach(
+      (b) =>
+        (b.onclick = () => {
+          state[key] = b.value
+          mark()
+          draw()
+        }),
+    )
+    mark()
+  }
+  draw()
 }
 
 function queryExplorer(queries) {
-  const outcome=q=>!q.accepted ? "Abstained" : q.correct ? "Correct match" : "Wrong match";
-  const label=q=>q.title || "Track "+q.track;
-  let page=0, selected, filtered=[];
-  const pageSize=6;
-  const plot = scorePlot(get("score-plot"), q=>{
-    selected=q;page=Math.floor(filtered.indexOf(q)/pageSize);show();
-  });
-  populate("genre", queries.map(q=>q.genre).filter(Boolean).sort());
+  let filtered = [],
+    page = 0,
+    selected
+  const pageSize = 4
+  const plot = scorePlot(get("score-plot"), get("plot-tip"), (q) => {
+    selected = q
+    page = Math.floor(filtered.indexOf(q) / pageSize)
+    show()
+  })
+  for (const genre of [...new Set(queries.map((q) => q.genre).filter(Boolean))].sort())
+    get("genre").add(new Option(genre, genre))
   function select(q) {
-    selected=q;plot(filtered, q);
-    for(const button of get("rows").children)
-      button.setAttribute("aria-pressed",String(button.dataset.id===String(q.id)));
-    const inspector=get("inspect");
-    inspector.replaceChildren(element("p","QUERY "+q.id,"eyebrow"),element("h3",label(q)),element("p",[q.artist,q.genre].filter(Boolean).join(" · ")));
-    const values=[
-      ["Source track","FMA "+q.track+(q.known ? " · in catalogue" : " · withheld")],
-      ["Synthetic clip",[optionName(q.family),q.condition].filter(Boolean).join(" · ")],
-      ["First candidate",[q.predicted_title,"FMA "+q.predicted].filter(Boolean).join(" · ")],
-      ["Runner-up",[q.runner_up_title,q.runner_up!=null ? "FMA "+q.runner_up : ""].filter(Boolean).join(" · ") || "—"],
-      ["Cosine score",format(q.score)],["Runner-up gap",format(q.gap)],["Decision",outcome(q)]
-    ];
-    const dl=element("dl");
-    for(const [key,value] of values) dl.append(element("dt",key),element("dd",value));
-    inspector.append(dl);
+    selected = q
+    plot(filtered, q)
+    for (const button of get("rows").children)
+      button.setAttribute("aria-pressed", String(button.dataset.id === q.id))
+    const who = el("div", null, "inspect-song"),
+      name = el("h3", title(q))
+    who.append(
+      el("span", outcome(q), "verdict"),
+      name,
+      el("p", [q.artist, q.genre].filter(Boolean).join(" · ")),
+    )
+    const story = el("div", null, "inspect-story")
+    const changes = q.condition
+      .split("+")
+      .map((k) => effects[k] || k.replaceAll("_", " "))
+      .join(", ")
+    story.append(
+      el(
+        "p",
+        (q.known ? "The original was in the library." : "We hid the original song.") +
+          " We tested it with " +
+          changes +
+          ".",
+      ),
+    )
+    const dl = el("dl")
+    for (const [key, value] of [
+      ["Best guess", q.predicted_title || "Track " + q.predicted],
+      ["Next closest", q.runner_up_title || "Unknown title"],
+      ["Match strength", q.score.toFixed(3)],
+      ["Lead", q.gap.toFixed(3)],
+    ]) {
+      const cell = el("div")
+      cell.append(el("dt", key), el("dd", value))
+      dl.append(cell)
+    }
+    story.append(dl)
+    get("inspect").replaceChildren(who, story)
   }
   function show() {
-    const rows=get("rows"), start=page*pageSize;
-    rows.replaceChildren();
-    const visible=filtered.slice(start,start+pageSize);
-    visible.forEach(q=>{
-      const button=element("button",null,"queryrow");
-      button.dataset.id=q.id;
-      const text=element("span");
-      text.append(element("b",label(q)),element("small","FMA "+q.track+" · "+optionName(q.family)+" · "+q.id));
-      button.append(text,element("span",outcome(q),"tag"));
-      button.onclick=()=>select(q);
-      rows.append(button);
-    });
-    if(visible.length) select(visible.includes(selected) ? selected : visible[0]);
+    const rows = get("rows"),
+      start = page * pageSize,
+      visible = filtered.slice(start, start + pageSize)
+    rows.replaceChildren(
+      ...visible.map((q) => {
+        const b = el("button", null, "queryrow"),
+          t = el("span")
+        b.dataset.id = q.id
+        t.append(el("b", title(q)), el("small", q.artist || "FMA " + q.track))
+        b.append(t, el("span", outcome(q), "tag"))
+        b.onclick = () => select(q)
+        return b
+      }),
+    )
+    if (visible.length) select(visible.includes(selected) ? selected : visible[0])
     else {
-      plot([],null);
-      rows.append(element("p","No matching queries. Try another filter.","empty"));
-      get("inspect").replaceChildren(element("h3","No query selected"));
+      plot([], null)
+      get("inspect").textContent = "No clips match these filters."
     }
-    get("count").textContent=visible.length ? (start+1)+"–"+(start+visible.length)+" of "+number.format(filtered.length) : "0 queries";
-    get("prev").disabled=page===0;
-    get("next").disabled=start+pageSize>=filtered.length;
+    get("count").textContent = visible.length
+      ? start + 1 + "–" + (start + visible.length) + " of " + count(filtered.length) + " clips"
+      : "0 clips"
+    get("prev").disabled = page === 0
+    get("next").disabled = start + pageSize >= filtered.length
   }
   function filter() {
-    const term=get("search").value.trim().toLowerCase();
-    filtered=queries.filter(q=>(get("outcome").selectedIndex===0 || outcome(q)===get("outcome").value)
-      && (get("genre").selectedIndex===0 || q.genre===get("genre").value)
-      && [q.id,q.track,q.title,q.artist,q.predicted,q.predicted_title,q.runner_up_title].some(v=>v!=null && String(v).toLowerCase().includes(term)));
-    page=0;show();
+    const term = get("search").value.trim().toLowerCase()
+    filtered = queries.filter(
+      (q) =>
+        (!get("outcome").value || outcome(q) === get("outcome").value) &&
+        (!get("genre").value || q.genre === get("genre").value) &&
+        [q.id, q.track, q.title, q.artist, q.predicted_title, q.runner_up_title].some(
+          (v) => v != null && String(v).toLowerCase().includes(term),
+        ),
+    )
+    page = 0
+    show()
   }
-  get("search").oninput=filter;
-  get("outcome").onchange=filter;get("genre").onchange=filter;
-  get("prev").onclick=()=>{page--;show()};
-  get("next").onclick=()=>{page++;show()};
-  filter();
+  get("search").oninput = filter
+  get("outcome").onchange = filter
+  get("genre").onchange = filter
+  get("prev").onclick = () => {
+    page--
+    show()
+  }
+  get("next").onclick = () => {
+    page++
+    show()
+  }
+  filter()
 }
-
 function coverage(genres) {
-  const rows=get("genre-rows");
-  for(const g of [...genres].sort((a,b)=>b.tracks-a.tracks)) {
-    const tr=element("tr");
-    for(const text of [g.genre,number.format(g.tracks),number.format(g.songs),number.format(g.correct)+" / "+number.format(g.clips)]) tr.append(element("td",text));
-    rows.append(tr);
+  const rows = get("genre-rows"),
+    sorted = [...genres].sort((a, b) => b.tracks - a.tracks)
+  const panel = get("genre-detail"),
+    layout = panel.parentElement
+  const small = matchMedia("(max-width:640px)")
+  let active
+  function inspect(g) {
+    active = g
+    const selectedButton = [...rows.querySelectorAll(".genre-row")].find((b) => b.value === g.genre)
+    if (small.matches) {
+      if (selectedButton.nextElementSibling !== panel) selectedButton.after(panel)
+    } else if (panel.parentElement !== layout) layout.append(panel)
+    for (const b of rows.querySelectorAll(".genre-row"))
+      b.setAttribute("aria-pressed", String(b.value === g.genre))
+    const link = el("a", "Explore " + g.genre + " clips →", "genre-link")
+    link.href = "#queries"
+    link.onclick = () => {
+      get("search").value = ""
+      get("outcome").value = ""
+      get("genre").value = g.genre
+      get("genre").dispatchEvent(new Event("change"))
+    }
+    const fraction = el("div", null, "genre-fraction")
+    fraction.append(el("strong", count(g.correct)), el("span", " / " + count(g.clips)))
+    get("genre-detail").replaceChildren(
+      el("h3", g.genre),
+      fraction,
+      el("p", "clips got the right title when the song was in the library."),
+      el(
+        "p",
+        "We tested " + count(g.songs) + " songs from this genre. The library holds " + count(g.tracks) + ".",
+        "genre-context",
+      ),
+      link,
+    )
   }
+  for (const g of sorted) {
+    const b = el("button", null, "genre-row")
+    b.value = g.genre
+    const rail = el("span", null, "genre-rail"),
+      fill = el("i")
+    fill.style.width = (100 * g.tracks) / sorted[0].tracks + "%"
+    rail.append(fill)
+    b.append(el("span", g.genre), rail, el("b", count(g.tracks)))
+    b.onfocus = b.onclick = () => inspect(g)
+    b.onpointerenter = (e) => {
+      if (e.pointerType === "mouse") inspect(g)
+    }
+    rows.append(b)
+  }
+  small.addEventListener("change", () => inspect(active))
+  inspect(sorted[0])
 }
-
+mountRuler(get("ruler")).catch(
+  () => (get("ruler").textContent = "The song map couldn’t load. Refresh to try again."),
+)
 try {
-  const reply=await fetch("/evidence.json");
-  if(!reply.ok) throw Error("Evidence load failed.");
-  const data=await reply.json();
-  benchmarks(data.methods);queryExplorer(data.queries);coverage(data.genres);
+  const response = await fetch("/evidence.json")
+  if (!response.ok) throw Error()
+  const data = await response.json()
+  benchmarks(data.methods)
+  queryExplorer(data.queries)
+  coverage(data.genres)
 } catch {
-  get("chart-note").textContent="Could not load the archived measurements. Reload the page to try again.";
-  get("chart").textContent="Measurements unavailable";get("rows").textContent="Query archive unavailable";
+  for (const id of ["chart", "rows", "genre-rows"])
+    get(id).textContent = "The results couldn’t load. Refresh to try again."
 }
-
-
-fetch("/listening-catalogue.json").then(r=>r.json()).then(rows=>{
-  get("demo-tracks").replaceChildren(...rows.map(r=>element("li",r.title+" · "+r.artist+" · FMA "+r.track_id)));
-}).catch(()=>{get("demo-tracks").textContent="Track list unavailable.";});
