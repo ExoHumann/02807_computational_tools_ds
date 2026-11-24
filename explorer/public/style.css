@@ -5,3 +5,5 @@
 
 
 .example{margin-top:20px;font-size:.9rem;color:#c0cebc}.example summary{cursor:pointer}.example audio{display:block;width:100%;max-width:340px;margin:12px 0}.example details{margin:14px 0}.example ul{max-height:180px;overflow:auto}.example a{color:inherit}
+
+.plot{margin:18px 0}.plot figcaption{color:var(--muted);max-width:80ch;font-size:.9rem}.plot b{color:var(--ink);font-size:1.2rem}.plot canvas{width:100%;height:230px;display:block;cursor:crosshair}.plot small{display:block;text-align:center}.plot small i{display:inline-block;width:9px;height:9px;border-radius:100%;margin:0 4px 0 16px}.present-dot{background:#368969}.absent-dot{background:#b76946}

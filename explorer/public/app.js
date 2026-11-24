@@ -1,3 +1,4 @@
+import {scorePlot} from "./scatter.js";
 import "./audio.js";
 const get = id => document.getElementById(id);
 const number = new Intl.NumberFormat("en");
@@ -48,9 +49,12 @@ function queryExplorer(queries) {
   const label=q=>q.title || "Track "+q.track;
   let page=0, selected, filtered=[];
   const pageSize=6;
+  const plot = scorePlot(get("score-plot"), q=>{
+    selected=q;page=Math.floor(filtered.indexOf(q)/pageSize);show();
+  });
   populate("genre", queries.map(q=>q.genre).filter(Boolean).sort());
   function select(q) {
-    selected=q;
+    selected=q;plot(filtered, q);
     for(const button of get("rows").children)
       button.setAttribute("aria-pressed",String(button.dataset.id===String(q.id)));
     const inspector=get("inspect");
@@ -81,6 +85,7 @@ function queryExplorer(queries) {
     });
     if(visible.length) select(visible.includes(selected) ? selected : visible[0]);
     else {
+      plot([],null);
       rows.append(element("p","No matching queries. Try another filter.","empty"));
       get("inspect").replaceChildren(element("h3","No query selected"));
     }
