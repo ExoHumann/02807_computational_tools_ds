@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101412"><title>Signal Index · Audio fingerprint lab</title>
+<link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body><header><div class="shell top"><a class="brand" href="#listen" aria-label="Signal Index home"><span class="logomark" aria-hidden="true">▥</span> Signal Index</a><nav aria-label="Page sections"><a href="#bench">Benchmarks</a><a href="#queries">Query explorer</a><a href="#coverage">Genres</a></nav></div></header>
+<main>
+<section id="listen" class="hero"><div class="shell split"><div class="intro"><p class="overline"><i></i> AUDIO FINGERPRINT LAB</p>
+<h1>Name that<br><em>recording.</em></h1>
+<p class="deck">Play a song and capture ten seconds. Match a clip against FMA Medium when the GPU is online. The hosted landmark matcher covers 24 recordings when the GPU is offline.</p>
+<div class="actions"><button id="record" class="primary"><span aria-hidden="true">●</span> Record 10 seconds</button><button id="upload" class="secondary">Upload clip <span aria-hidden="true">↗</span></button><input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" hidden></div>
+<p class="hint">Uploads · 10–30 s · up to 8 MiB · first 10 s searched</p>
+<details class="example"><summary>Play a recording from the catalogue</summary>
+<p>Jay Laurier · Don’t Let ’Em Scrap the British Navy · FMA 020096 · <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a></p>
+<audio controls preload="none" src="/listen.wav"></audio><button id="try-example" class="secondary">Identify this excerpt</button><details><summary>See all 24 hosted tracks</summary><ul id="demo-tracks"></ul></details></details>
+</div><div class="instrument"><div class="instrument-top mono"><span>INPUT MONITOR</span><span>MONO / 24 kHz</span></div><canvas id="scope" aria-label="Audio input monitor"></canvas><div class="meter mono" aria-hidden="true"><span>0 s</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10 s</span></div><div id="status" role="status" aria-live="polite"><i></i><div><strong id="status-title">Ready to listen</strong><span id="status-detail">Record or upload a clip to begin.</span></div></div></div>
+</div></section>
+<div class="shell body">
+<section id="bench"><p class="eyebrow">RETRIEVAL BENCHMARK</p><div class="secthead"><div><h2>Search at scale.</h2><p>The same synthetic clips, searched against two catalogue sizes. Compare correct track IDs, single-query latency and throughput in batches of 128.</p></div><a class="source" href="https://github.com/nickiliak/02807_computational_tools_ds/pull/13">Run notebook ↗</a></div>
+<div class="panel"><div class="controls"><label>Catalogue<select id="catalogue"></select></label><label>Clip family<select id="family"></select></label><label>Measure<select id="metric"><option value="accuracy">Top-1 accuracy</option><option value="ms">Median lookup time</option><option value="qps">Batch throughput</option></select></label></div>
+<div id="chart" aria-live="polite">Loading measurements…</div><p id="chart-note" class="note"></p></div>
+</section>
+<section id="queries"><p class="eyebrow">HELD-OUT QUERIES</p><div class="secthead"><div><h2>Trace a decision.</h2><p>Inspect 2,048 held-out clips from the Medium exact-cosine score-and-gap test (PR 6). Some source songs were deliberately removed. Open a query to see what the index returned and whether the calibrated rule accepted it.</p></div><a class="source" href="https://github.com/nickiliak/02807_computational_tools_ds/pull/14">Experiment sources ↗</a></div>
+<div class="panel"><div class="controls"><label class="wide">Find a query<input id="search" type="search" placeholder="Song, artist, track or query ID"></label><label>Outcome<select id="outcome"><option>All outcomes</option><option>Correct match</option><option>Wrong match</option><option>Abstained</option></select></label><label>Genre<select id="genre"><option>All genres</option></select></label></div><div class="querygrid"><div class="results"><div class="listhead mono"><span>SOURCE / QUERY</span><span>OUTCOME</span></div><div id="rows"></div><div class="pager"><button id="prev" aria-label="Previous page">←</button><span id="count" aria-live="polite"></span><button id="next" aria-label="Next page">→</button></div></div><aside id="inspect" aria-live="polite"><h3>Query details</h3></aside></div></div>
+</section>
+<section id="coverage"><p class="eyebrow">SUBSET COVERAGE</p><div class="secthead"><div><h2>Who is in the index?</h2><p>Each row pairs Medium catalogue coverage with the number of tested songs and correctly accepted clips in the original rejection study. Small groups can move sharply with a single song.</p></div></div><details class="panel"><summary>Browse genre breakdown <span>＋</span></summary><div class="scroll"><table><thead><tr><th>Genre</th><th>Catalogue tracks</th><th>Test songs</th><th>Correct / known clips</th></tr></thead><tbody id="genre-rows"></tbody></table></div></details></section>
+</div></main><footer><div class="shell"><strong>Signal Index</strong><span>DTU 02807 · Computational Tools for Data Science</span><a href="https://github.com/nickiliak/02807_computational_tools_ds">Project repository ↗</a></div></footer>
+</body></html>
